@@ -50,3 +50,21 @@ def root():
         "status": "Telex AI Fitness Tip Agent running",
         "rpc_endpoint": "POST /rpc",
     }
+
+
+@app.get("/manifest")
+def manifest():
+    """
+    Returns metadata about this A2A agent for Telex integration.
+    Required fields: name, short_description, description, author, version.
+    """  # noqa: D205
+    return {
+        "name": "Telex AI Fitness Tip Agent",
+        "short_description": "Provides daily fitness tips via A2A JSON-RPC protocol.",
+        "description": (
+            "An A2A agent that generates and sends AI-powered daily fitness "
+            "tips using JSON-RPC 2.0. Designed for use with Telex workflows."
+        ),
+        "author": "Wilson Icheku",
+        "version": "1.0.0",
+    }
