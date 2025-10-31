@@ -47,12 +47,12 @@ async def message(request: Request):
 
     if "history" in user_input:
         tips = load_cache()
-        return {"status": "ok", "action": "get_history", "data": tips}
+        return tips
 
     if "refresh" in user_input or "force" in user_input:
         tip = await generate_tip(force_new=True)
         save_tip(tip)
-        return {"status": "ok", "action": "force_refresh", "message": tip}
+        return tip
 
     tip = await generate_tip()
     save_tip(tip)
