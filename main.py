@@ -2,10 +2,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from tips import generate_tip
 
 from cache import ensure_cache_exists, load_cache, save_tip
 from scheduler import schedule_daily_job, scheduler
+from tips import generate_tip
 
 
 @asynccontextmanager
@@ -56,7 +56,7 @@ async def message(request: Request):
 
     tip = await generate_tip()
     save_tip(tip)
-    return {"status": "ok", "action": "get_daily_tip", "message": tip}
+    return tip
 
 
 @app.get("/")
