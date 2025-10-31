@@ -44,7 +44,7 @@ app = FastAPI(title="Telex AI Fitness Tip Agent", lifespan=lifespan)
 @app.post("/message")
 async def message(payload: DailyTip):
     try:
-        text = payload.tip.lower().strip()
+        text = payload.text.lower().strip()
         if "history" in text:
             history = get_history()
             return history
