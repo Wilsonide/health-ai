@@ -1,22 +1,34 @@
 import asyncio
+import datetime
 
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from cache import save_tip
-from tips import generate_tip
+from cache import add_tip_to_history, get_cached_tip_for_today
+from config import DAILY_TIP_HOUR_UTC
+from openai_client import generate_tip_from_openai
 
-scheduler = BackgroundScheduler()
+scheduler = AsyncIOScheduler()
 
 
-def daily_job():
-    """Generate and store a new daily tip."""
-    print("🌅 Running daily tip generation...")
-    tip = asyncio.run(generate_tip(force_new=True))
-    save_tip(tip)
-    print(f"✅ New daily tip generated: {tip}")
+async def _scheduled_generate():
+    try:
+        existing = get_cached_tip_for_today()
+        if existing:
+            return
+        tip = await generate_tip_from_openai()
+        add_tip_to_history(tip)
+    except Exception as e:  # noqa: BLE001
+        print("Scheduled generation failed:", e)
 
 
 def schedule_daily_job():
-    """Schedules the daily tip refresh."""
-    scheduler.add_job(daily_job, "interval", hours=24)
+    # Cron: run daily at DAILY_TIP_HOUR_UTC:00 UTC
+    scheduler.add_job(
+        func=lambda: asyncio.create_task(_scheduled_generate()),
+        trigger="cron",
+        hour=DAILY_TIP_HOUR_UTC,
+        minute=0,
+        id="daily_tip_job",
+        replace_existing=True,
+    )
     scheduler.start()
