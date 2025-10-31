@@ -1,70 +1,67 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from tips import generate_tip
 
-from cache import ensure_cache_exists
-from rpc import handle_rpc
-from scheduler import schedule_daily_job, scheduler  # 👈 import scheduler instance
+from cache import ensure_cache_exists, load_cache, save_tip
+from scheduler import schedule_daily_job, scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Handles startup and shutdown lifecycle:
-    - Ensures cache file exists
-    - Starts the scheduler
-    - Stops it gracefully on shutdown.
-    """  # noqa: D205
-    # ---- Startup ----
+    """Handles startup and shutdown lifecycle."""
     ensure_cache_exists()
     schedule_daily_job()
     print("✅ Scheduler started")
-
-    # Run the application
     yield
-
-    # ---- Shutdown ----
     if scheduler.running:
         scheduler.shutdown(wait=False)
         print("🛑 Scheduler stopped cleanly")
 
 
-# --- FastAPI app instance ---
-app = FastAPI(title="Telex AI Fitness Tip Agent", lifespan=lifespan)
-
-
-# --- JSON-RPC Endpoint ---
-@app.post("/rpc")
-async def rpc_endpoint(request: Request):
-    """
-    Single JSON-RPC 2.0 endpoint.
-    Accepts a JSON-RPC request body and returns a JSON-RPC response.
-    """  # noqa: D205
-    return await handle_rpc(request)
-
-
-# --- Root status endpoint (optional) ---
-@app.get("/")
-def root():
-    return {
-        "status": "Telex AI Fitness Tip Agent running",
-        "rpc_endpoint": "POST /rpc",
-    }
+app = FastAPI(title="Telex AI Fitness Agent (REST, OpenAI)", lifespan=lifespan)
 
 
 @app.get("/manifest")
 def manifest():
-    """
-    Returns metadata about this A2A agent for Telex integration.
-    Required fields: name, short_description, description, author, version.
-    """  # noqa: D205
+    """Metadata for Telex integration."""
     return {
-        "name": "Telex AI Fitness Tip Agent",
-        "short_description": "Provides daily fitness tips via A2A JSON-RPC protocol.",
-        "description": (
-            "An A2A agent that generates and sends AI-powered daily fitness "
-            "tips using JSON-RPC 2.0. Designed for use with Telex workflows."
-        ),
+        "name": "Fitness Tip Agent (OpenAI)",
+        "version": "1.1.0",
         "author": "Wilson Icheku",
-        "version": "1.0.0",
+        "description": "An AI-powered health & fitness agent using OpenAI to generate daily wellness tips.",
+        "endpoints": {
+            "message": "/message",
+            "manifest": "/manifest",
+        },
+        "actions": ["get_daily_tip", "get_history", "force_refresh"],
+    }
+
+
+@app.post("/message")
+async def message(request: Request):
+    """Main endpoint — accepts user input and returns AI-generated tips."""
+    data = await request.json()
+    user_input = data.get("text", "").lower().strip()
+
+    if "history" in user_input:
+        tips = load_cache()
+        return {"status": "ok", "action": "get_history", "data": tips}
+
+    if "refresh" in user_input or "force" in user_input:
+        tip = await generate_tip(force_new=True)
+        save_tip(tip)
+        return {"status": "ok", "action": "force_refresh", "message": tip}
+
+    tip = await generate_tip()
+    save_tip(tip)
+    return {"status": "ok", "action": "get_daily_tip", "message": tip}
+
+
+@app.get("/")
+def root():
+    return {
+        "status": "running",
+        "message": "Telex Fitness Agent (REST, OpenAI) is active!",
     }
