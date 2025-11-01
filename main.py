@@ -15,7 +15,7 @@ from schemas import TelexRequest
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Handles startup and shutdown lifecycle."""
+    """Startup & shutdown logic."""
     ensure_cache_exists()
     schedule_daily_job()
     print("✅ Scheduler started")
@@ -30,29 +30,30 @@ app = FastAPI(title="Telex AI Fitness Tip Agent", lifespan=lifespan)
 
 @app.post("/message")
 async def message(request: Request):
-    """Handles Telex message events and responds intelligently."""
+    """Handles Telex messages — uses only the latest text input."""
     try:
         payload = await request.json()
         req = TelexRequest(**payload)
 
-        # Extract the latest user message
+        # Extract the latest text part only (ignore history)
         message_obj = req.params.message
         parts = message_obj.parts or []
-        current_text = (
-            parts[-1].text.strip().lower() if parts and parts[-1].text else ""
-        )
 
-        if not current_text:
+        if not parts or not parts[-1].text:
             return JSONResponse(
-                {"status": "error", "message": "No user input text found."},
+                {"status": "error", "message": "No valid user message found."},
                 status_code=400,
             )
 
-        # Normalize & split words
+        # Always use ONLY the most recent text
+        current_text = parts[-1].text.strip().lower()
+        print(f"🗣️ Received current text: {current_text}")
+
+        # Split into words for command parsing
         words = current_text.split()
         command = words[0] if words else ""
 
-        # --- Handle commands based on first keyword ---
+        # --- Handle Commands ---
         if command in {"refresh", "force", "update"}:
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
@@ -81,14 +82,14 @@ async def message(request: Request):
                 "message": tip,
             }
 
-        # --- Default fallback if no command matched ---
+        # --- Default: show menu/help ---
         return {
             "status": "ok",
             "message": (
-                "👋 Hey there! Choose an option:\n"
-                "• Type **tip** to get your daily fitness advice 💪\n"
-                "• Type **refresh** to generate a new one 🔁\n"
-                "• Type **history** to view past tips 📜"
+                "👋 Hey there! What would you like to do?\n\n"
+                "• Type **tip** to get your daily fitness tip 💪\n"
+                "• Type **refresh** to get a new tip 🔁\n"
+                "• Type **history** to view your past tips 📜"
             ),
         }
 
@@ -97,7 +98,7 @@ async def message(request: Request):
         return JSONResponse(
             {
                 "status": "error",
-                "message": "Something went wrong. Please try again later.",
+                "message": "Something went wrong while processing your request.",
                 "error": str(e),
             },
             status_code=500,
@@ -114,7 +115,7 @@ def root():
             "tips using JSON-RPC 2.0. Designed for use with Telex workflows."
         ),
         "author": "Wilson Icheku",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "status": "running",
         "message": "Telex Fitness Agent (REST, OpenAI) is active!",
     }
