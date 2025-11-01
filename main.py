@@ -32,10 +32,10 @@ async def lifespan(app: FastAPI):
 # --- FastAPI app instance ---
 app = FastAPI(title="Telex AI Fitness Tip Agent", lifespan=lifespan)
 
-# --- CORS Middleware ---
+# --- Enable CORS ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # You can replace "*" with a list like ["https://telex.im"]
+    allow_origins=["*"],  # adjust later for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,7 +45,7 @@ app.add_middleware(
 # --- JSON-RPC Endpoint ---
 @app.post("/message")
 async def message(request: Request):
-    """Main endpoint — accepts user input and returns AI-generated tips."""
+    """Accepts A2A Telex requests and returns fitness tips."""
     try:
         payload = await request.json()
         req = TelexRequest(**payload)
@@ -56,18 +56,21 @@ async def message(request: Request):
         current_text = ""
         conversation_history = []
 
-        # --- Extract current user intent (index 0) and conversation data (index 1) ---
-        if len(parts) >= 1 and parts[0].kind == "text":
-            current_text = parts[0].text.strip().lower()
+        # --- Extract user text (first text part only) ---
+        for part in parts:
+            if part.kind == "text" and part.text:
+                current_text = part.text.strip().lower()
+                break  # only first text part needed
 
-        if len(parts) >= 2 and parts[1].kind == "data":
-            data_part = parts[1].data
-            if isinstance(data_part, list):
+        # --- Extract conversation history (if any) ---
+        for part in parts:
+            if part.kind == "data" and part.data:
                 conversation_history = [
-                    item.get("text", "") for item in data_part if isinstance(item, dict)
+                    item.text for item in part.data if getattr(item, "text", None)
                 ]
+                break
 
-        print(f"🗣️ User Input: {current_text}")
+        print(f"🗣️ User Input: {current_text or '[none]'}")
         print(
             f"💬 Conversation history (last {len(conversation_history)} msgs) received."
         )
@@ -78,41 +81,34 @@ async def message(request: Request):
                 status_code=400,
             )
 
-        print(f"🗣️ Last 5 words from user: {current_text}")
+        # --- Take only the last 5 words of input ---
+        words = current_text.split()
+        last_five = " ".join(words[-5:])
+
+        print(f"🗣️ Last 5 words from user: {last_five}")
 
         # --- Command handling ---
-        if "history" in current_text:
+        if "history" in last_five:
             history = get_history()
             print("📜 Returning tip history:", history)
-            return {
-                "status": "ok",
-                "action": "get_history",
-                "data": history,
-            }
+            return {"status": "ok", "action": "get_history", "data": history}
 
-        if "refresh" in current_text or "force" in current_text:
+        if "refresh" in last_five or "force" in last_five:
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
-            print(f"💡 Fitness Tip: {tip}")
-            return {
-                "status": "ok",
-                "action": "force_refresh",
-                "message": tip,
-            }
+            print(f"💡 Refreshed Fitness Tip: {tip}")
+            return {"status": "ok", "action": "force_refresh", "message": tip}
 
+        # --- Default: return daily tip ---
         tip = get_cached_tip_for_today()
         if not tip:
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
 
             print(f"💡 Fitness Tip: {tip}")
-            return {
-                "status": "ok",
-                "action": "get_daily_tip",
-                "message": tip,
-            }
+            return {"status": "ok", "action": "get_daily_tip", "message": tip}
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"⚠️ Error processing message: {e}")
         return JSONResponse(
             {
