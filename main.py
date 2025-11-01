@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from cache import (
@@ -11,7 +11,6 @@ from cache import (
 )
 from openai_client import generate_tip_from_openai
 from scheduler import schedule_daily_job, scheduler
-from schemas import DailyTip  # 👈 import scheduler instance
 
 
 @asynccontextmanager
@@ -42,9 +41,11 @@ app = FastAPI(title="Telex AI Fitness Tip Agent", lifespan=lifespan)
 
 # --- JSON-RPC Endpoint ---
 @app.post("/message")
-async def message(payload: DailyTip):
+async def message(request: Request):
+    """Main endpoint — accepts user input and returns AI-generated tips."""
     try:
-        text = payload.text.lower().strip()
+        data = await request.json()
+        text = data.get("text", "").lower().strip()
         if "history" in text:
             history = get_history()
             return history
