@@ -11,6 +11,7 @@ from cache import (
 )
 from openai_client import generate_tip_from_openai
 from scheduler import schedule_daily_job, scheduler
+from schemas import TelexRequest
 
 
 @asynccontextmanager
@@ -45,19 +46,37 @@ async def message(request: Request):
     """Main endpoint — accepts user input and returns AI-generated tips."""
     try:
         data = await request.json()
-        text = data.get("text", "").lower().strip()
-        if "history" in text:
+        req = TelexRequest(**data)
+
+        # Extract user input text
+        user_text = req.params.message.parts[0].text.strip().lower()
+        if "history" in user_text:
             history = get_history()
-            return history
-        if "refresh" in text or "force" in text:
+            print("📜 Returning tip history",history)
+            return {
+                "status": "ok",
+                "action": "get_history",
+                "data": history,
+            }
+        if "refresh" in user_text or "force" in user_text:
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
-            return tip
+            print(f"💡 Fitness Tip: {tip}")
+            return {
+                "status": "ok",
+                "action": "force_refresh",
+                "message": tip
+            }
         tip = get_cached_tip_for_today()
         if not tip:
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
-        return tip  # noqa: TRY300
+        print(f"💡 Fitness Tip: {tip}")
+        return {
+            "status": "ok",
+            "action": "get_daily_tip",
+            "message": tip
+        }
     except Exception as e:  # noqa: BLE001
         print(f"⚠️ Error processing message: {e}")
         return JSONResponse(

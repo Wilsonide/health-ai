@@ -3,7 +3,6 @@ import time
 
 from fastapi import HTTPException
 from openai import OpenAI
-from schemas import DailyTip
 from utils import sanitize_text
 
 from config import (
