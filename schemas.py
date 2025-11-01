@@ -1,12 +1,15 @@
-from typing import Any
-
 from pydantic import BaseModel
+
+
+class MessageDataItem(BaseModel):
+    kind: str
+    text: str | None = None
 
 
 class MessagePart(BaseModel):
     kind: str
-    text: str | None = None
-    data: list[Any] | None = None
+    text: str | None = None  # ✅ optional now
+    data: list[MessageDataItem] | None = None  # ✅ supports data parts too
 
 
 class MessageParams(BaseModel):
