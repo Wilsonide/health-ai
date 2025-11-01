@@ -45,12 +45,22 @@ app = FastAPI(title="Telex AI Fitness Tip Agent", lifespan=lifespan)
 async def message(request: Request):
     """Main endpoint — accepts user input and returns AI-generated tips."""
     try:
-        data = await request.json()
-        req = TelexRequest(**data)
+        payload = await request.json()
+        req = TelexRequest(**payload)
 
-        # Extract user input text
-        user_text = req.params.message.parts[0].text.strip().lower()
-        current_text = user_text.split()[-1].lower() if user_text else ""
+        message_obj = req.params.message
+        parts = message_obj.parts
+        current_text = ""
+
+        if parts and isinstance(parts, list):
+            # Take the latest part's text only
+            current_text = parts[-1].text.strip().lower()
+
+        if not current_text:
+            return JSONResponse(
+                {"status": "error", "message": "No user input text found."},
+                status_code=400,
+            )
         if "history" in current_text:
             history = get_history()
             print("📜 Returning tip history",history)
