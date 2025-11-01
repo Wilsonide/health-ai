@@ -54,13 +54,23 @@ async def message(request: Request):
         parts = message_obj.parts or []
 
         current_text = ""
-        if parts and isinstance(parts, list):
-            latest_part = parts[-1].text.strip() if parts[-1].text else ""
+        conversation_history = []
 
-            # --- Extract last 5 words only ---
-            words = latest_part.split()
-            last_five_words = words[-5:]
-            current_text = " ".join(last_five_words).lower()
+        # --- Extract current user intent (index 0) and conversation data (index 1) ---
+        if len(parts) >= 1 and parts[0].kind == "text":
+            current_text = parts[0].text.strip().lower()
+
+        if len(parts) >= 2 and parts[1].kind == "data":
+            data_part = parts[1].data
+            if isinstance(data_part, list):
+                conversation_history = [
+                    item.get("text", "") for item in data_part if isinstance(item, dict)
+                ]
+
+        print(f"🗣️ User Input: {current_text}")
+        print(
+            f"💬 Conversation history (last {len(conversation_history)} msgs) received."
+        )
 
         if not current_text:
             return JSONResponse(
