@@ -50,7 +50,8 @@ async def message(request: Request):
 
         # Extract user input text
         user_text = req.params.message.parts[0].text.strip().lower()
-        if "history" in user_text:
+        current_text = user_text.split()[-1].lower() if user_text else ""
+        if "history" in current_text:
             history = get_history()
             print("📜 Returning tip history",history)
             return {
@@ -58,7 +59,7 @@ async def message(request: Request):
                 "action": "get_history",
                 "data": history,
             }
-        if "refresh" in user_text or "force" in user_text:
+        if "refresh" in current_text or "force" in current_text:
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
             print(f"💡 Fitness Tip: {tip}")
