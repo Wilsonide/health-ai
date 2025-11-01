@@ -60,9 +60,9 @@ async def generate_tip_from_openai() -> str:
         # sanitize lightly before validation
         raw = sanitize_text(raw)
         # validate with Pydantic; this will raise if invalid
-        validated = DailyTip(tip=raw)
+        validated = raw
         # enforce max char length
-        tip_out = validated.tip
+        tip_out = validated
         if len(tip_out) > MAX_TIP_LENGTH_CHARS:
             tip_out = tip_out[:MAX_TIP_LENGTH_CHARS].rsplit(" ", 1)[0] + "..."
         else:
