@@ -1,6 +1,4 @@
 import asyncio
-import datetime
-
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from cache import add_tip_to_history, get_cached_tip_for_today
@@ -11,24 +9,31 @@ scheduler = AsyncIOScheduler()
 
 
 async def _scheduled_generate():
+    """Generate and cache a new daily fitness tip asynchronously."""
     try:
         existing = get_cached_tip_for_today()
         if existing:
+            print("ℹ️ Tip already cached for today — skipping.")
             return
+
         tip = await generate_tip_from_openai()
         add_tip_to_history(tip)
+        print("✅ Scheduled daily tip generated successfully.")
     except Exception as e:  # noqa: BLE001
-        print("Scheduled generation failed:", e)
+        print(f"⚠️ Scheduled generation failed: {e}")
 
 
 def schedule_daily_job():
-    # Cron: run daily at DAILY_TIP_HOUR_UTC:00 UTC
+    """Schedules a daily async job using AsyncIOScheduler safely."""
+    # Schedule the coroutine directly — APScheduler with AsyncIOScheduler supports async funcs
     scheduler.add_job(
-        func=lambda: asyncio.create_task(_scheduled_generate()),
+        _scheduled_generate,
         trigger="cron",
         hour=DAILY_TIP_HOUR_UTC,
         minute=0,
         id="daily_tip_job",
         replace_existing=True,
     )
+
     scheduler.start()
+    print("🕒 Daily job scheduled successfully.")

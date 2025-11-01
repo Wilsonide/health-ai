@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -16,78 +15,83 @@ from schemas import TelexRequest
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Handles startup and shutdown lifecycle:
-    - Ensures cache file exists
-    - Starts the scheduler
-    - Stops it gracefully on shutdown.
-    """  # noqa: D205
-    # ---- Startup ----
+    """Handles startup and shutdown lifecycle."""
     ensure_cache_exists()
     schedule_daily_job()
     print("✅ Scheduler started")
-
-    # Run the application
     yield
-
-    # ---- Shutdown ----
     if scheduler.running:
         scheduler.shutdown(wait=False)
         print("🛑 Scheduler stopped cleanly")
 
 
-# --- FastAPI app instance ---
 app = FastAPI(title="Telex AI Fitness Tip Agent", lifespan=lifespan)
 
 
-# --- JSON-RPC Endpoint ---
 @app.post("/message")
 async def message(request: Request):
-    """Main endpoint — accepts user input and returns AI-generated tips."""
+    """Handles Telex message events and responds intelligently."""
     try:
         payload = await request.json()
         req = TelexRequest(**payload)
 
+        # Extract the latest user message
         message_obj = req.params.message
-        parts = message_obj.parts
-        current_text = ""
-
-        if parts and isinstance(parts, list):
-            # Take the latest part's text only
-            current_text = parts[-1].text.strip().lower()
+        parts = message_obj.parts or []
+        current_text = (
+            parts[-1].text.strip().lower() if parts and parts[-1].text else ""
+        )
 
         if not current_text:
             return JSONResponse(
                 {"status": "error", "message": "No user input text found."},
                 status_code=400,
             )
-        if "history" in current_text:
+
+        # Normalize & split words
+        words = current_text.split()
+        command = words[0] if words else ""
+
+        # --- Handle commands based on first keyword ---
+        if command in {"refresh", "force", "update"}:
+            tip = await generate_tip_from_openai()
+            add_tip_to_history(tip)
+            return {
+                "status": "ok",
+                "action": "force_refresh",
+                "message": tip,
+            }
+
+        elif command in {"history", "past", "list"}:
             history = get_history()
-            print("📜 Returning tip history",history)
             return {
                 "status": "ok",
                 "action": "get_history",
                 "data": history,
             }
-        if "refresh" in current_text or "force" in current_text:
-            tip = await generate_tip_from_openai()
-            add_tip_to_history(tip)
-            print(f"💡 Fitness Tip: {tip}")
+
+        elif command in {"tip", "daily", "get"}:
+            tip = get_cached_tip_for_today()
+            if not tip:
+                tip = await generate_tip_from_openai()
+                add_tip_to_history(tip)
             return {
                 "status": "ok",
-                "action": "force_refresh",
-                "message": tip
+                "action": "get_daily_tip",
+                "message": tip,
             }
-        tip = get_cached_tip_for_today()
-        if not tip:
-            tip = await generate_tip_from_openai()
-            add_tip_to_history(tip)
-        print(f"💡 Fitness Tip: {tip}")
+
+        # --- Default fallback if no command matched ---
         return {
             "status": "ok",
-            "action": "get_daily_tip",
-            "message": tip
+            "message": (
+                "👋 Hey there! Choose an option:\n"
+                "• Type **tip** to get your daily fitness advice 💪\n"
+                "• Type **refresh** to generate a new one 🔁\n"
+                "• Type **history** to view past tips 📜"
+            ),
         }
+
     except Exception as e:  # noqa: BLE001
         print(f"⚠️ Error processing message: {e}")
         return JSONResponse(
