@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from cache import (
@@ -28,9 +29,20 @@ async def lifespan(app: FastAPI):
         print("🛑 Scheduler stopped cleanly")
 
 
+# --- FastAPI app instance ---
 app = FastAPI(title="Telex AI Fitness Tip Agent", lifespan=lifespan)
 
+# --- CORS Middleware ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # You can replace "*" with a list like ["https://telex.im"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+
+# --- JSON-RPC Endpoint ---
 @app.post("/message")
 async def message(request: Request):
     """Main endpoint — accepts user input and returns AI-generated tips."""
@@ -83,14 +95,14 @@ async def message(request: Request):
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
 
-        print(f"💡 Fitness Tip: {tip}")
-        return {
-            "status": "ok",
-            "action": "get_daily_tip",
-            "message": tip,
-        }
+            print(f"💡 Fitness Tip: {tip}")
+            return {
+                "status": "ok",
+                "action": "get_daily_tip",
+                "message": tip,
+            }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"⚠️ Error processing message: {e}")
         return JSONResponse(
             {
