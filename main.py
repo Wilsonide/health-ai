@@ -55,7 +55,7 @@ async def message(request: Request):
 
         current_text = ""
         conversation_history = []
-        print("my texts: ", parts.text)
+        print("my texts: ", parts[0].text)
 
         # --- Extract user text (first text part only) ---
         for part in parts:
