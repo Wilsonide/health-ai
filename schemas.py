@@ -1,22 +1,23 @@
 from typing import Any
+
 from pydantic import BaseModel
 
 
-class TelexMessagePart(BaseModel):
+class MessagePart(BaseModel):
     kind: str
-    text: str
+    text: str | None = None
+    data: list[Any] | None = None
 
 
-class TelexMessage(BaseModel):
+class MessageParams(BaseModel):
     kind: str
     role: str
-    parts: list[TelexMessagePart]
-    messageId: str
+    parts: list[MessagePart]
+    messageId: str | None = None
 
 
 class TelexParams(BaseModel):
-    message: TelexMessage
-    configuration: dict[str, Any]
+    message: MessageParams
 
 
 class TelexRequest(BaseModel):
