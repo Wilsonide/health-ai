@@ -8,23 +8,23 @@ class MessageDataItem(BaseModel):
 
 class MessagePart(BaseModel):
     kind: str
-    text: str | None = None  # ✅ optional now
-    data: list[MessageDataItem] | None = None  # ✅ supports data parts too
+    text: str | None = None  # For "text" parts
+    data: list[MessageDataItem] | None = None  # For "data" parts
 
 
-class MessageParams(BaseModel):
+class Message(BaseModel):
     kind: str
     role: str
     parts: list[MessagePart]
     messageId: str | None = None
 
 
-class TelexParams(BaseModel):
-    message: MessageParams
+class Params(BaseModel):
+    message: Message
 
 
 class TelexRequest(BaseModel):
     jsonrpc: str
     id: str
     method: str
-    params: TelexParams
+    params: Params
