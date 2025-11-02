@@ -112,7 +112,6 @@ async def message(request: Request):
         print(f"💬 Response: {response_text}")
 
         # --- Push message back to Telex chat ---
-        # --- Push message back to Telex chat ---
         if push_url and push_token:
             async with httpx.AsyncClient() as client:
                 headers = {
@@ -120,16 +119,18 @@ async def message(request: Request):
                     "Content-Type": "application/json",
                 }
 
-                # ✅ Correct Telex chat payload shape
+                # ✅ Proper JSON-RPC 2.0 format for Telex
                 payload_to_telex = {
-                    "kind": "message",
-                    "role": "assistant",
-                    "parts": [
-                        {
-                            "kind": "text",
-                            "text": response_text,
-                        },
-                    ],
+                    "jsonrpc": "2.0",
+                    "id": "1",
+                    "method": "message/send",
+                    "params": {
+                        "message": {
+                            "kind": "message",
+                            "role": "assistant",
+                            "parts": [{"kind": "text", "text": response_text}],
+                        }
+                    },
                 }
 
                 print(f"📡 Pushing to Telex: {push_url}")
@@ -154,6 +155,9 @@ async def message(request: Request):
                             status_code=500,
                         )
 
+                    print("✅ Message pushed successfully.")
+                    return {"status": "ok", "message": "Response sent to Telex chat."}
+
                 except Exception as push_err:
                     print(f"⚠️ Push error: {push_err}")
                     return JSONResponse(
@@ -164,16 +168,6 @@ async def message(request: Request):
                         },
                         status_code=500,
                     )
-
-        else:
-            print("⚠️ No push_url or push_token provided in payload.")
-            return JSONResponse(
-                {
-                    "status": "error",
-                    "message": "Missing push_url or push_token in configuration.",
-                },
-                status_code=400,
-            )
 
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
