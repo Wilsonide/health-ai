@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -23,7 +23,7 @@ class DataPart(BaseModel):
 
 
 # ✅ Allow text, file, and data kinds
-MessagePart = Union[TextPart, FilePart, DataPart]
+MessagePart = TextPart | FilePart | DataPart
 
 
 # -------------------------------------------------------------------
