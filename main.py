@@ -57,20 +57,18 @@ async def message(request: Request):
         push_url = config.get("url")
         push_token = config.get("token")
 
-        # --- Extract user text robustly ---
+        # --- Extract ONLY the last user text ---
         current_text = ""
 
         if parts:
-            # Try main message text first
-            if parts[0].get("kind") == "text" and parts[0].get("text"):
+            # 1️⃣ Try first part (system interpretation text)
+            if parts[0].get("kind") == "text" and parts[0].get("text", "").strip():
                 current_text = parts[0]["text"].strip()
-
-            # If empty, look for nested data array in any part
-            if not current_text:
-                for part in parts:
+            else:
+                # 2️⃣ Otherwise, check for the last text entry in 'data'
+                for part in reversed(parts):
                     data_array = part.get("data", [])
                     if isinstance(data_array, list) and data_array:
-                        # Take the last non-empty text entry
                         for data_item in reversed(data_array):
                             if (
                                 data_item.get("kind") == "text"
@@ -144,7 +142,7 @@ def root():
             "tips using JSON-RPC 2.0. Designed for use with Telex workflows."
         ),
         "author": "Wilson Icheku",
-        "version": "1.0.1",
+        "version": "1.0.2",
         "status": "running",
         "message": "Telex Fitness Agent (REST, OpenAI) is active!",
     }
