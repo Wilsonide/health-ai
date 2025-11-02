@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
+
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import httpx
 
 from cache import (
     add_tip_to_history,
@@ -56,19 +57,31 @@ async def message(request: Request):
         push_url = config.get("url")
         push_token = config.get("token")
 
-        # --- Extract user text ---
+        # --- Extract user text robustly ---
         current_text = ""
+
         if parts:
-            # First part should be Telex’s interpretation of user intent
+            # Try main message text first
             if parts[0].get("kind") == "text" and parts[0].get("text"):
                 current_text = parts[0]["text"].strip()
-            else:
-                # fallback: maybe from the data array
-                data_parts = parts[0].get("data", []) if len(parts) > 0 else []
-                if data_parts:
-                    current_text = data_parts[-1].get("text", "").strip()
 
-        print(f"🗣️ Extracted text: {current_text}")
+            # If empty, look for nested data array in any part
+            if not current_text:
+                for part in parts:
+                    data_array = part.get("data", [])
+                    if isinstance(data_array, list) and data_array:
+                        # Take the last non-empty text entry
+                        for data_item in reversed(data_array):
+                            if (
+                                data_item.get("kind") == "text"
+                                and data_item.get("text", "").strip()
+                            ):
+                                current_text = data_item["text"].strip()
+                                break
+                    if current_text:
+                        break
+
+        print(f"🗣️ Extracted user text: {current_text!r}")
 
         if not current_text:
             return JSONResponse(
@@ -79,7 +92,9 @@ async def message(request: Request):
         # --- Command handling ---
         if "history" in current_text.lower():
             history = get_history()
-            response_text = "\n".join(history) if history else "No fitness history found yet."
+            response_text = (
+                "\n".join(history) if history else "No fitness history found yet."
+            )
         elif "refresh" in current_text.lower() or "force" in current_text.lower():
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
@@ -105,7 +120,7 @@ async def message(request: Request):
                 await client.post(push_url, json=data, headers=headers)
                 print("📤 Sent response to Telex chat UI.")
 
-        return {"status": "ok", "message": "Response sent to Telex chat."}
+            return {"status": "ok", "message": "Response sent to Telex chat."}
 
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
