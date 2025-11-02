@@ -43,23 +43,34 @@ app.add_middleware(
 
 # --- JSON-RPC Endpoint ---
 @app.post("/message")
-async def message(request: Request):
+async def message(request: Request):  # noqa: C901, PLR0912
     """Accepts A2A Telex requests and returns fitness tips."""
     try:
         payload = await request.json()
         print("📩 Incoming payload:", payload)
 
-        # --- Extract user message from Telex JSON-RPC payload ---
+        # --- Try to extract text from multiple possible Telex structures ---
         current_text = None
-        try:
-            current_text = (
-                payload.get("params", {})
-                .get("message", {})
-                .get("parts", [])[0]
-                .get("text")
-            )
-        except Exception:
-            # fallback for direct {"text": "..."} payloads
+
+        # Option 1: Direct Telex message part
+        parts = payload.get("params", {}).get("message", {}).get("parts", [])
+        if parts:
+            # Check for direct text
+            if "text" in parts[0] and parts[0]["text"].strip():
+                current_text = parts[0]["text"].strip()
+            else:
+                # Try nested data field (parts[1]["data"])
+                for p in parts:
+                    if p.get("kind") == "data" and isinstance(p.get("data"), list):
+                        for d in p["data"]:
+                            if d.get("kind") == "text" and d.get("text"):
+                                current_text = d["text"].strip()
+                                break
+                    if current_text:
+                        break
+
+        # Option 2: Fallback for simple {"text": "..."} payload
+        if not current_text:
             current_text = payload.get("text")
 
         print("🗣️ Extracted text:", current_text)
@@ -79,7 +90,7 @@ async def message(request: Request):
         if "history" in current_text.lower():
             history = get_history()
             print("📜 Returning tip history:", history)
-            return {"status": "ok", "history": history}
+            return history
 
         if any(
             word in current_text.lower() for word in ["refresh", "force", "new tip"]
@@ -87,7 +98,7 @@ async def message(request: Request):
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
             print(f"💡 Refreshed Fitness Tip: {tip}")
-            return {"status": "ok", "tip": tip}
+            return tip
 
         # --- Default: return daily tip ---
         tip = get_cached_tip_for_today()
@@ -95,8 +106,8 @@ async def message(request: Request):
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
 
-        print(f"💪 Fitness Tip: {tip}")
-        return {"status": "ok", "tip": tip}
+            print(f"💪 Fitness Tip: {tip}")
+            return tip
 
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
