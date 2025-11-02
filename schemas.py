@@ -116,7 +116,7 @@ class RpcResult(BaseModel):
     contextId: str
     status: ResponseStatus
     artifacts: list[Artifact]
-    kind: Literal["task"]
+    kind: Literal["task", "message"]
 
 
 class RpcResponse(BaseModel):
