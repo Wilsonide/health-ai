@@ -49,7 +49,7 @@ async def message(request: Request):
     try:
         payload = await request.json()
         print("my payload: ", payload)
-        current_text = payload.text
+        current_text = payload["text"]
         print("my text: ", current_text)
 
         if not current_text:
