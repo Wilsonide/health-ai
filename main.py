@@ -76,7 +76,7 @@ async def message(request: Request):
         rpc_request = RpcRequest(**data)
         if rpc_request.jsonrpc != "2.0" or rpc_request.method != "message/send":
             return JSONResponse(
-                RpcResponse(jsonrpc="2.0", id=rpc_request.id).model_dump(),
+                RpcResponse(jsonrpc="2.0", id=rpc_request.id).model_dump(mode="json"),
                 status_code=400,
             )
 
@@ -132,7 +132,7 @@ async def message(request: Request):
 
         if not user_text:
             return JSONResponse(
-                RpcResponse(jsonrpc="2.0", id=rpc_request.id).model_dump(),
+                RpcResponse(jsonrpc="2.0", id=rpc_request.id).model_dump(mode="json"),
                 status_code=400,
             )
 
@@ -199,12 +199,14 @@ async def message(request: Request):
         )
 
         print("✅ Sending RPC Response:", rpc_response.model_dump())
-        return JSONResponse(content=rpc_response.model_dump(), status_code=200)
+        return JSONResponse(
+            content=rpc_response.model_dump(mode="json"), status_code=200
+        )
 
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
         return JSONResponse(
-            RpcResponse(jsonrpc="2.0", id=None).model_dump(),
+            RpcResponse(jsonrpc="2.0", id=None).model_dump(mode="json"),
             status_code=500,
         )
 
