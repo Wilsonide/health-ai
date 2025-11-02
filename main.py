@@ -18,12 +18,11 @@ from scheduler import schedule_daily_job, scheduler
 from schemas import (
     Artifact,
     Message,
-    MessagePart,
     Result,
-    RpcError,
     RpcRequest,
     RpcResponse,
     Status,
+    TextPart,
 )
 
 
@@ -163,7 +162,7 @@ async def message(request: Request):
         print(f"💬 Response message: {tip_text}")
 
         # --- ✅ Construct RpcResult ---
-        msg_part = MessagePart(kind="text", text=tip_text)
+        msg_part = TextPart(kind="text", text=tip_text)
         msg_response = Message(
             kind="message",
             role="agent",
@@ -176,7 +175,7 @@ async def message(request: Request):
             Artifact(
                 artifactId=str(uuid.uuid4()),
                 name="tip",
-                parts=[MessagePart(kind="text", text=tip_text)],
+                parts=[msg_part],
             ),
         ]
 
