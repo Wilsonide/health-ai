@@ -64,7 +64,7 @@ class RpcRequestParams(BaseModel):
 
 class RpcRequest(BaseModel):
     jsonrpc: Literal["2.0"]
-    id: str | int
+    id: str | int | None = None
     method: Literal["message/send"]
     params: RpcRequestParams
 
@@ -121,6 +121,6 @@ class RpcResult(BaseModel):
 
 class RpcResponse(BaseModel):
     jsonrpc: Literal["2.0"] = "2.0"
-    id: str | int
+    id: str | int | None = None
     result: RpcResult | None = None
     error: RpcError | None = None
