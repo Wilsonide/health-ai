@@ -90,7 +90,7 @@ async def message(request: Request):
             )
 
         # --- Command handling ---
-        if "history" in current_text.lower():
+        if "history" in current_text.lower() or "log" in current_text.lower():
             history = get_history()
 
             if not history:
