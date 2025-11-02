@@ -76,7 +76,6 @@ async def message(request: Request):
         # ✅ Validate JSON-RPC structure
         rpc_request = RpcRequest(**data)
         if rpc_request.jsonrpc != "2.0" or rpc_request.method != "message/send":
-            error = RpcError(code=-32600, message="Invalid JSON-RPC request format")
             return JSONResponse(
                 RpcResponse(jsonrpc="2.0", id=rpc_request.id).model_dump(),
                 status_code=400,
@@ -88,24 +87,51 @@ async def message(request: Request):
 
         # --- Extract last valid user text ---
         user_text = ""
+
         for part in reversed(parts):
-            if part.kind == "text" and part.text.strip():
-                user_text = clean_text(part.text)
-                break
-            if part.kind == "data":
-                for item in reversed(part.data):
-                    if item.kind == "text" and item.text.strip():
-                        user_text = clean_text(item.text)
+            kind = (
+                part.get("kind")
+                if isinstance(part, dict)
+                else getattr(part, "kind", None)
+            )
+
+            if kind == "text":
+                text_value = (
+                    part.get("text")
+                    if isinstance(part, dict)
+                    else getattr(part, "text", "")
+                )
+                if text_value and text_value.strip():
+                    user_text = clean_text(text_value)
+                    break
+
+            elif kind == "data":
+                data_items = (
+                    part.get("data")
+                    if isinstance(part, dict)
+                    else getattr(part, "data", [])
+                )
+                for item in reversed(data_items):
+                    item_kind = (
+                        item.get("kind")
+                        if isinstance(item, dict)
+                        else getattr(item, "kind", None)
+                    )
+                    item_text = (
+                        item.get("text")
+                        if isinstance(item, dict)
+                        else getattr(item, "text", "")
+                    )
+                    if item_kind == "text" and item_text and item_text.strip():
+                        user_text = clean_text(item_text)
                         break
+
             if user_text:
                 break
 
         print(f"🗣️ User input: {user_text!r}")
 
         if not user_text:
-            error = RpcError(
-                code=-32602, message="No valid text input found in message."
-            )
             return JSONResponse(
                 RpcResponse(jsonrpc="2.0", id=rpc_request.id).model_dump(),
                 status_code=400,
@@ -178,9 +204,6 @@ async def message(request: Request):
 
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
-        error = RpcError(
-            code=-32000, message="Internal Server Error", data={"detail": str(e)}
-        )
         return JSONResponse(
             RpcResponse(jsonrpc="2.0", id=None).model_dump(),
             status_code=500,
