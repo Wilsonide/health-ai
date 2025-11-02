@@ -142,7 +142,7 @@ async def message(request: Request):
         rpc_result = RpcResult(
             id=str(uuid.uuid4()),
             contextId=str(rpc_request.id or uuid.uuid4()),
-            kind="message",
+            kind="task",
             status=ResponseStatus(
                 state="completed",
                 timestamp=datetime.now(UTC).isoformat(),
