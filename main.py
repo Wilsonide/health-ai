@@ -72,8 +72,10 @@ async def message(request: Request):
             error = RpcError(code=-32600, message="Invalid JSON-RPC request format")
             return JSONResponse(
                 content=RpcResponse(
-                    jsonrpc="2.0", id=rpc_request.id, error=error
-                ).model_dump(),
+                    jsonrpc="2.0",
+                    id=rpc_request.id,
+                    error=error,
+                ).model_dump(mode="json"),
                 status_code=400,
             )
 
@@ -102,7 +104,7 @@ async def message(request: Request):
             return JSONResponse(
                 content=RpcResponse(
                     jsonrpc="2.0", id=rpc_request.id, error=error
-                ).model_dump(),
+                ).model_dump(mode="json"),
                 status_code=400,
             )
 
@@ -156,7 +158,9 @@ async def message(request: Request):
         )
 
         print("✅ Outgoing RPC response:", rpc_response.model_dump())
-        return JSONResponse(content=rpc_response.model_dump(), status_code=200)
+        return JSONResponse(
+            content=rpc_response.model_dump(mode="json"), status_code=200
+        )
 
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
@@ -164,7 +168,9 @@ async def message(request: Request):
             code=-32000, message="Internal Server Error", data={"detail": str(e)}
         )
         rpc_response = RpcResponse(jsonrpc="2.0", id=None, error=error)
-        return JSONResponse(content=rpc_response.model_dump(), status_code=500)
+        return JSONResponse(
+            content=rpc_response.model_dump(mode="json"), status_code=500
+        )
 
 
 @app.get("/")
