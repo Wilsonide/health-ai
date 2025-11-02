@@ -57,12 +57,9 @@ async def message(request: Request):
         params = payload.get("params", {})
         message_obj = params.get("message", {})
         parts = message_obj.get("parts", [])
-        config = params.get("configuration", {}).get("pushNotificationConfig", {})
-
-        push_url = config.get("url")
-        push_token = config.get("token")
 
         current_text = ""
+        response_text = ""
 
         if parts:
             # 1️⃣ Prefer the first text part if present and non-empty
@@ -110,64 +107,13 @@ async def message(request: Request):
             response_text = f"💪 Today's Fitness Tip:\n{tip}"
 
         print(f"💬 Response: {response_text}")
-
-        # --- Push message back to Telex chat ---
-        if push_url and push_token:
-            async with httpx.AsyncClient() as client:
-                headers = {
-                    "Authorization": f"Bearer {push_token}",
-                    "Content-Type": "application/json",
-                }
-
-                # ✅ Proper JSON-RPC 2.0 format for Telex
-                payload_to_telex = {
-                    "jsonrpc": "2.0",
-                    "id": "1",
-                    "method": "message/send",
-                    "params": {
-                        "message": {
-                            "kind": "message",
-                            "role": "assistant",
-                            "parts": [{"kind": "text", "text": response_text}],
-                        }
-                    },
-                }
-
-                print(f"📡 Pushing to Telex: {push_url}")
-                print(f"🔐 Using token: {push_token[:6]}...")
-
-                try:
-                    push_response = await client.post(
-                        push_url, json=payload_to_telex, headers=headers, timeout=10.0
-                    )
-
-                    print(
-                        f"📨 Push status: {push_response.status_code} - {push_response.text}"
-                    )
-
-                    if push_response.status_code >= 400:
-                        return JSONResponse(
-                            {
-                                "status": "error",
-                                "message": f"Telex push failed ({push_response.status_code})",
-                                "response": push_response.text,
-                            },
-                            status_code=500,
-                        )
-
-                    print("✅ Message pushed successfully.")
-                    return {"status": "ok", "message": "Response sent to Telex chat."}
-
-                except Exception as push_err:
-                    print(f"⚠️ Push error: {push_err}")
-                    return JSONResponse(
-                        {
-                            "status": "error",
-                            "message": "Failed to push message to Telex chat.",
-                            "error": str(push_err),
-                        },
-                        status_code=500,
-                    )
+        return JSONResponse(
+            {
+                "status": "success",
+                "message": response_text,
+            },
+            status_code=200,
+        )
 
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
