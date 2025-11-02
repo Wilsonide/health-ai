@@ -12,7 +12,6 @@ from cache import (
 )
 from openai_client import generate_tip_from_openai
 from scheduler import schedule_daily_job, scheduler
-from schemas import TelexRequest
 
 
 @asynccontextmanager
@@ -48,9 +47,22 @@ async def message(request: Request):
     """Accepts A2A Telex requests and returns fitness tips."""
     try:
         payload = await request.json()
-        print("my payload: ", payload)
-        current_text = payload["text"]
-        print("my text: ", current_text)
+        print("📩 Incoming payload:", payload)
+
+        # --- Extract user message from Telex JSON-RPC payload ---
+        current_text = None
+        try:
+            current_text = (
+                payload.get("params", {})
+                .get("message", {})
+                .get("parts", [])[0]
+                .get("text")
+            )
+        except Exception:
+            # fallback for direct {"text": "..."} payloads
+            current_text = payload.get("text")
+
+        print("🗣️ Extracted text:", current_text)
 
         if not current_text:
             return JSONResponse(
@@ -61,20 +73,21 @@ async def message(request: Request):
         # --- Take only the last 5 words of input ---
         words = current_text.split()
         last_five = " ".join(words[-5:])
-
-        print(f"🗣️ Last 5 words from user: {last_five}")
+        print(f"🧠 Last 5 words: {last_five}")
 
         # --- Command handling ---
-        if "history" in current_text:
+        if "history" in current_text.lower():
             history = get_history()
             print("📜 Returning tip history:", history)
-            return history
+            return {"status": "ok", "history": history}
 
-        if "refresh" in current_text or "force" in current_text:
+        if any(
+            word in current_text.lower() for word in ["refresh", "force", "new tip"]
+        ):
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
             print(f"💡 Refreshed Fitness Tip: {tip}")
-            return tip
+            return {"status": "ok", "tip": tip}
 
         # --- Default: return daily tip ---
         tip = get_cached_tip_for_today()
@@ -82,15 +95,15 @@ async def message(request: Request):
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
 
-            print(f"💡 Fitness Tip: {tip}")
-            return tip
+        print(f"💪 Fitness Tip: {tip}")
+        return {"status": "ok", "tip": tip}
 
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
         return JSONResponse(
             {
                 "status": "error",
-                "message": "Something went wrong. Please try again later.",
+                "message": "Something went wrong while processing your request.",
                 "error": str(e),
             },
             status_code=500,
