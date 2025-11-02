@@ -1,27 +1,23 @@
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel
 
 
 # -------------------------------------------------------------------
-# 📦 Message Parts
+# 🎯 Message Parts
 # -------------------------------------------------------------------
 class TextPart(BaseModel):
     kind: Literal["text"]
     text: str
 
 
-class DataItem(BaseModel):
-    kind: Literal["text"]
-    text: str
+class FilePart(BaseModel):
+    kind: Literal["file"]
+    file_url: str
 
 
-class DataPart(BaseModel):
-    kind: Literal["data"]
-    data: list[DataItem]
-
-
-MessagePart = TextPart | DataPart
+MessagePart = TextPart | FilePart
 
 
 # -------------------------------------------------------------------
@@ -29,98 +25,46 @@ MessagePart = TextPart | DataPart
 # -------------------------------------------------------------------
 class Message(BaseModel):
     kind: Literal["message"]
+    messageId: str
     role: str
     parts: list[MessagePart]
-    messageId: str | None = None
+    taskId: str
 
 
 # -------------------------------------------------------------------
-# ⚙️ Configuration Object
+# 🧩 Artifact Object
 # -------------------------------------------------------------------
-class AuthenticationConfig(BaseModel):
-    schemes: list[str]
-
-
-class PushNotificationConfig(BaseModel):
-    url: str
-    token: str
-    authentication: AuthenticationConfig
-
-
-class Configuration(BaseModel):
-    acceptedOutputModes: list[str]  # noqa: N815
-    historyLength: int  # noqa: N815
-    pushNotificationConfig: PushNotificationConfig  # noqa: N815
-    blocking: bool
-
-
-# -------------------------------------------------------------------
-# 📨 RPC Request (Telex A2A Standard)
-# -------------------------------------------------------------------
-class RpcRequestParams(BaseModel):
-    message: Message
-    configuration: Configuration | None = None
-
-
-class RpcRequest(BaseModel):
-    jsonrpc: Literal["2.0"]
-    id: str | int | None = None
-    method: Literal["message/send"]
-    params: RpcRequestParams
-
-
-# -------------------------------------------------------------------
-# ❌ RPC Error Object
-# -------------------------------------------------------------------
-class RpcError(BaseModel):
-    code: int
-    message: str
-    data: Any | None = None
-
-
-# -------------------------------------------------------------------
-# ✅ RPC Response (Telex A2A Standard)
-# -------------------------------------------------------------------
-class MessageResponsePart(BaseModel):
-    kind: Literal["text"]
-    text: str
-
-
-class MessageResponse(BaseModel):
-    kind: Literal["message"]
-    role: Literal["agent"]
-    parts: list[MessageResponsePart]
-    messageId: str | None = None
-
-
-class ResponseStatus(BaseModel):
-    state: Literal["completed"]
-    timestamp: str
-    message: MessageResponse
-
-
-class ArtifactPart(BaseModel):
-    kind: str
-    text: str | None = None
-    data: Any | None = None
-
-
 class Artifact(BaseModel):
     artifactId: str
     name: str
-    parts: list[ArtifactPart]
+    parts: list[MessagePart]
 
 
-class RpcResult(BaseModel):
+# -------------------------------------------------------------------
+# 🔄 Status Object
+# -------------------------------------------------------------------
+class Status(BaseModel):
+    state: str
+    timestamp: datetime
+    message: Message
+
+
+# -------------------------------------------------------------------
+# 🧠 Result Object
+# -------------------------------------------------------------------
+class Result(BaseModel):
     id: str
     contextId: str
-    status: ResponseStatus
+    status: Status
     artifacts: list[Artifact]
-    kind: Literal["task", "message"]
+    history: list[Any]
+    kind: Literal["task"]
 
 
+# -------------------------------------------------------------------
+# 📤 RPC Response
+# -------------------------------------------------------------------
 class RpcResponse(BaseModel):
-    jsonrpc: Literal["2.0"] = "2.0"
-    id: str | int | None = None
-    result: RpcResult | None = None
-    error: RpcError | None = None
+    jsonrpc: Literal["2.0"]
+    id: str
+    result: Result
