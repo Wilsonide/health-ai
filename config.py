@@ -4,11 +4,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    raise RuntimeError("OPENAI_API_KEY is required")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY is required")
 
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.5-flash")
 CACHE_FILE = os.getenv("CACHE_FILE", "cache.json")
 HISTORY_SIZE = int(os.getenv("HISTORY_SIZE", "7"))
 DAILY_TIP_HOUR_UTC = int(os.getenv("DAILY_TIP_HOUR_UTC", "7"))

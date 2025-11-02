@@ -1,7 +1,7 @@
 import re
 import uuid
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +13,7 @@ from cache import (
     get_cached_tip_for_today,
     get_history,
 )
-from openai_client import generate_tip_from_openai
+from openai_client import generate_tip_from_gemini
 from scheduler import schedule_daily_job, scheduler
 from schemas import (
     MessageResponse,
@@ -28,7 +28,7 @@ from schemas import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Handle startup and shutdown lifecycle."""
+    """Lifecycle: start cache + scheduler."""
     ensure_cache_exists()
     schedule_daily_job()
     print("✅ Scheduler started")
@@ -40,7 +40,15 @@ async def lifespan(app: FastAPI):
         print("🛑 Scheduler stopped cleanly")
 
 
-app = FastAPI(title="Telex AI Fitness Tip Agent", lifespan=lifespan)
+app = FastAPI(
+    title="Telex AI Fitness Tip Agent",
+    lifespan=lifespan,
+    description=(
+        "An A2A agent that provides AI-powered daily fitness and wellness tips. "
+        "It supports fetching today's cached tip, refreshing for a new one, "
+        "and viewing a full history of past tips."
+    ),
+)
 
 # --- Enable CORS ---
 app.add_middleware(
@@ -59,23 +67,17 @@ def clean_text(text: str) -> str:
 
 @app.post("/message")
 async def message(request: Request):
-    """Accepts Telex A2A JSON-RPC requests and returns fitness tips."""
+    """Handles Telex A2A message/send requests."""
     try:
         data = await request.json()
         print("📩 Incoming payload:", data)
 
-        # ✅ Validate incoming RPC request
+        # ✅ Validate JSON-RPC structure
         rpc_request = RpcRequest(**data)
-
-        # Verify request format
         if rpc_request.jsonrpc != "2.0" or rpc_request.method != "message/send":
             error = RpcError(code=-32600, message="Invalid JSON-RPC request format")
             return JSONResponse(
-                content=RpcResponse(
-                    jsonrpc="2.0",
-                    id=rpc_request.id,
-                    error=error,
-                ).model_dump(mode="json"),
+                RpcResponse(jsonrpc="2.0", id=rpc_request.id, error=error).model_dump(),
                 status_code=400,
             )
 
@@ -84,65 +86,63 @@ async def message(request: Request):
         parts = message_obj.parts or []
 
         # --- Extract last valid user text ---
-        current_text = ""
+        user_text = ""
         for part in reversed(parts):
             if part.kind == "text" and part.text.strip():
-                current_text = clean_text(part.text)
+                user_text = clean_text(part.text)
                 break
             if part.kind == "data":
                 for item in reversed(part.data):
                     if item.kind == "text" and item.text.strip():
-                        current_text = clean_text(item.text)
+                        user_text = clean_text(item.text)
                         break
-            if current_text:
+            if user_text:
                 break
 
-        print(f"🗣️ Extracted user text: {current_text!r}")
+        print(f"🗣️ User input: {user_text!r}")
 
-        if not current_text:
-            error = RpcError(code=-32602, message="No valid user input text found.")
+        if not user_text:
+            error = RpcError(
+                code=-32602, message="No valid text input found in message."
+            )
             return JSONResponse(
-                content=RpcResponse(
-                    jsonrpc="2.0", id=rpc_request.id, error=error
-                ).model_dump(mode="json"),
+                RpcResponse(jsonrpc="2.0", id=rpc_request.id, error=error).model_dump(),
                 status_code=400,
             )
 
-        # --- Command Handling ---
-        if "history" in current_text.lower() or "log" in current_text.lower():
+        # --- Command Logic ---
+        if "history" in user_text.lower() or "log" in user_text.lower():
             history = get_history()
-            response_text = (
-                "No fitness history found yet."
-                if not history
-                else "📜 Your Fitness Tip History:\n"
-                + "\n".join(
+            if not history:
+                tip_text = "No fitness history found yet."
+            else:
+                tip_text = "📜 Your Fitness Tip History:\n" + "\n".join(
                     item.get("tip") if isinstance(item, dict) else str(item)
                     for item in history
                 )
-            )
 
-        elif "refresh" in current_text.lower() or "force" in current_text.lower():
-            tip = await generate_tip_from_openai()
+        elif "refresh" in user_text.lower() or "new tip" in user_text.lower():
+            tip = await generate_tip_from_gemini()
             add_tip_to_history(tip)
-            response_text = f"🔄 Refreshed Fitness Tip:\n{tip}"
+            tip_text = f"🔄 New Fitness Tip:\n{tip}"
 
         else:
             tip = get_cached_tip_for_today()
             if not tip:
-                tip = await generate_tip_from_openai()
+                tip = await generate_tip_from_gemini()
                 add_tip_to_history(tip)
-            response_text = f"💪 Today's Fitness Tip:\n{tip}"
+            tip_text = f"💪 Today's Fitness Tip:\n{tip}"
 
-        print(f"💬 Response text: {response_text}")
+        print(f"💬 Response message: {tip_text}")
 
-        # --- ✅ Construct A2A-Compliant RpcResult ---
-        msg_part = MessageResponsePart(kind="text", text=response_text)
+        # --- ✅ Construct RpcResult ---
+        msg_part = MessageResponsePart(kind="text", text=tip_text)
         msg_response = MessageResponse(kind="message", role="agent", parts=[msg_part])
 
         rpc_result = RpcResult(
             id=str(uuid.uuid4()),
             contextId=str(rpc_request.id or uuid.uuid4()),
-            kind="task",
+            kind="message",
             status=ResponseStatus(
                 state="completed",
                 timestamp=datetime.now(UTC).isoformat(),
@@ -157,33 +157,39 @@ async def message(request: Request):
             result=rpc_result,
         )
 
-        print("✅ Outgoing RPC response:", rpc_response.model_dump())
-        return JSONResponse(
-            content=rpc_response.model_dump(mode="json"), status_code=200
-        )
+        print("✅ Sending RPC Response:", rpc_response.model_dump())
+        return JSONResponse(content=rpc_response.model_dump(), status_code=200)
 
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
         error = RpcError(
             code=-32000, message="Internal Server Error", data={"detail": str(e)}
         )
-        rpc_response = RpcResponse(jsonrpc="2.0", id=None, error=error)
         return JSONResponse(
-            content=rpc_response.model_dump(mode="json"), status_code=500
+            RpcResponse(jsonrpc="2.0", id=None, error=error).model_dump(),
+            status_code=500,
         )
 
 
 @app.get("/")
 def root():
+    """Expose metadata for discovery."""
     return {
-        "name": "Telex AI Fitness Tip Agent",
-        "short_description": "Provides daily fitness tips, retrieves history logs, and refreshes tips.",
-        "description": (
-            "An A2A agent that generates AI-powered daily fitness tips, "
-            "retrieves fitness history, and supports tip refreshing via JSON-RPC 2.0."
+        "id": "fitAI_agent_001",
+        "name": "fitness_tip_agent",
+        "category": "health & wellness",
+        "short_description": "Provides daily AI-powered fitness tips with refresh and history retrieval.",
+        "long_description": (
+            "An intelligent fitness and health assistant that delivers daily, personalized "
+            "AI-generated tips on exercise, nutrition, and wellness. "
+            "You can:\n"
+            "- 💪 Get today’s cached daily fitness tip\n"
+            "- 🔄 Manually refresh for a brand new tip\n"
+            "- 📜 View your complete history of past tips\n\n"
+            "Perfect for keeping your wellness journey consistent and motivated every day."
         ),
         "author": "Wilson Icheku",
-        "version": "1.0.5",
+        "version": "1.1.1",
         "status": "running",
-        "message": "Telex Fitness Agent (A2A, OpenAI) is active!",
+        "message": "Telex AI Fitness Tip Agent active — ready for daily tips, refresh, and history logs!",
     }

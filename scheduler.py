@@ -3,7 +3,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from cache import add_tip_to_history, get_cached_tip_for_today
 from config import DAILY_TIP_HOUR_UTC
-from openai_client import generate_tip_from_openai
+from openai_client import generate_tip_from_gemini
 
 scheduler = AsyncIOScheduler()
 
@@ -16,7 +16,7 @@ async def _scheduled_generate():
             print("ℹ️ Tip already cached for today — skipping.")
             return
 
-        tip = await generate_tip_from_openai()
+        tip = await generate_tip_from_gemini()
         add_tip_to_history(tip)
         print("✅ Scheduled daily tip generated successfully.")
     except Exception as e:  # noqa: BLE001

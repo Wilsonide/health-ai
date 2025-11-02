@@ -1,11 +1,11 @@
 {
   "active": true,
   "category": "health & wellness",
-  "description": "A workflow that provides daily AI-powered health and fitness tips via REST API.",
   "id": "fitAI_agent_001",
   "name": "fitness_tip_agent",
-  "short_description": "Provides personalized daily fitness and health tips using AI.",
-  "long_description": "You are an intelligent health and fitness assistant that delivers daily, personalized wellness advice. Your primary function is to help users improve their lifestyle through short, actionable tips on exercise, nutrition, sleep, and mental well-being. When responding:\n- Generate one short, motivational fitness or health tip per request\n- Vary topics daily across fitness, diet, and mindfulness\n- Keep messages friendly, concise, and encouraging\n- Avoid repetitive tips and focus on positive reinforcement.",
+  "short_description": "Provides daily AI-powered fitness tips with refresh and history retrieval.",
+  "description": "A workflow that delivers daily AI-generated fitness and wellness tips. Users can get today's cached tip, refresh for a new one, or view their full history of past tips — all via a Telex-compatible A2A API.",
+  "long_description": "You are an intelligent fitness and wellness assistant that helps users stay motivated every day with personalized health insights. You can:\n- 💪 Get today's cached daily fitness tip\n- 🔄 Refresh manually for a brand-new AI-generated tip\n- 📜 Retrieve full history logs of past fitness advice\n\nEach tip focuses on short, actionable advice related to exercise, nutrition, mindfulness, and healthy habits. Keep responses motivational, concise, and positively reinforcing.",
   "nodes": [
     {
       "id": "fitness_agent",
