@@ -92,9 +92,24 @@ async def message(request: Request):
         # --- Command handling ---
         if "history" in current_text.lower():
             history = get_history()
-            response_text = (
-                "\n".join(history) if history else "No fitness history found yet."
-            )
+
+            if not history:
+                response_text = "No fitness history found yet."
+            else:
+                # Safely handle list of strings or dicts
+                safe_history = []
+                for item in history:
+                    if isinstance(item, dict):
+                        text_val = item.get("tip") or item.get("text") or str(item)
+                        safe_history.append(text_val)
+                    elif isinstance(item, str):
+                        safe_history.append(item)
+                    else:
+                        safe_history.append(str(item))
+
+                response_text = "📜 Your Fitness Tip History:\n" + "\n".join(
+                    safe_history,
+                )
         elif "refresh" in current_text.lower() or "force" in current_text.lower():
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
@@ -131,10 +146,10 @@ async def message(request: Request):
 def root():
     return {
         "name": "Telex AI Fitness Tip Agent",
-        "short_description": "Provides daily fitness tips via A2A JSON-RPC protocol.",
+        "short_description": "Provides daily fitness tips, retrieves full fitness history logs and also allows refreshing tips.",
         "description": (
             "An A2A agent that generates and sends AI-powered daily fitness "
-            "tips using JSON-RPC 2.0. Designed for use with Telex workflows."
+            "tips, retrieves full fitness history logs and also allows refreshing tips using JSON-RPC 2.0. Designed for use with Telex workflows."
         ),
         "author": "Wilson Icheku",
         "version": "1.0.3",
