@@ -189,7 +189,7 @@ async def message(request: Request):
             ),
             artifacts=artifacts,
             history=parts,
-            kind="message",
+            kind="task",
         )
 
         rpc_response = RpcResponse(
