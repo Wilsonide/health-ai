@@ -49,34 +49,8 @@ async def message(request: Request):
     try:
         payload = await request.json()
         print("my payload: ", payload)
-        req = TelexRequest(**payload)
-        print("myrequest : ", req)
-
-        message_obj = req.params.message
-        parts = message_obj.parts or []
-
-        current_text = ""
-        conversation_history = []
-        print("my texts: ", parts[0].text)
-
-        # --- Extract user text (first text part only) ---
-        for part in parts:
-            if part.kind == "text" and part.text:
-                current_text = part.text.strip().lower()
-                break  # only first text part needed
-
-        # --- Extract conversation history (if any) ---
-        for part in parts:
-            if part.kind == "data" and part.data:
-                conversation_history = [
-                    item.text for item in part.data if getattr(item, "text", None)
-                ]
-                break
-
-        print(f"🗣️ User Input: {current_text or '[none]'}")
-        print(
-            f"💬 Conversation history (last {len(conversation_history)} msgs) received."
-        )
+        current_text = payload.text
+        print("my text: ", current_text)
 
         if not current_text:
             return JSONResponse(
