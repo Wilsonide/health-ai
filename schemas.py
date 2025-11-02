@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, Union
 
 from pydantic import BaseModel
 
@@ -17,7 +17,13 @@ class FilePart(BaseModel):
     file_url: str
 
 
-MessagePart = TextPart
+class DataPart(BaseModel):
+    kind: Literal["data"]
+    data: list[dict[str, Any]]
+
+
+# ✅ Allow text, file, and data kinds
+MessagePart = Union[TextPart, FilePart, DataPart]
 
 
 # -------------------------------------------------------------------
@@ -28,7 +34,7 @@ class Message(BaseModel):
     messageId: str
     role: str
     parts: list[MessagePart]
-    taskId: str
+    taskId: str | None = None  # ✅ some messages won't have it
 
 
 # -------------------------------------------------------------------
@@ -37,7 +43,7 @@ class Message(BaseModel):
 class Artifact(BaseModel):
     artifactId: str
     name: str
-    parts: list[FilePart | TextPart]
+    parts: list[MessagePart]  # ✅ supports both text/file parts
 
 
 # -------------------------------------------------------------------
@@ -57,8 +63,17 @@ class Result(BaseModel):
     contextId: str
     status: Status
     artifacts: list[Artifact]
-    history: list[Any]
+    history: list[Any] = []  # ✅ safe default
     kind: Literal["task"]
+
+
+# -------------------------------------------------------------------
+# ❌ RPC Error Object
+# -------------------------------------------------------------------
+class RpcError(BaseModel):
+    code: int
+    message: str
+    data: Any | None = None
 
 
 # -------------------------------------------------------------------
@@ -66,10 +81,14 @@ class Result(BaseModel):
 # -------------------------------------------------------------------
 class RpcResponse(BaseModel):
     jsonrpc: Literal["2.0"]
-    id: str
-    result: Result
+    id: str | None = None  # ✅ allow None in error cases
+    result: Result | None = None  # ✅ optional for error
+    error: RpcError | None = None  # ✅ properly support JSON-RPC error
 
 
+# -------------------------------------------------------------------
+# ⚙️ Configuration Models
+# -------------------------------------------------------------------
 class AuthenticationConfig(BaseModel):
     schemes: list[str]
 
@@ -81,9 +100,9 @@ class PushNotificationConfig(BaseModel):
 
 
 class Configuration(BaseModel):
-    acceptedOutputModes: list[str]  # noqa: N815
-    historyLength: int  # noqa: N815
-    pushNotificationConfig: PushNotificationConfig  # noqa: N815
+    acceptedOutputModes: list[str]
+    historyLength: int
+    pushNotificationConfig: PushNotificationConfig
     blocking: bool
 
 
@@ -97,12 +116,3 @@ class RpcRequest(BaseModel):
     id: str | int | None = None
     method: Literal["message/send"]
     params: RpcRequestParams
-
-
-# -------------------------------------------------------------------
-# ❌ RPC Error Object
-# -------------------------------------------------------------------
-class RpcError(BaseModel):
-    code: int
-    message: str
-    data: Any | None = None

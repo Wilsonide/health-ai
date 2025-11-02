@@ -78,7 +78,7 @@ async def message(request: Request):
         if rpc_request.jsonrpc != "2.0" or rpc_request.method != "message/send":
             error = RpcError(code=-32600, message="Invalid JSON-RPC request format")
             return JSONResponse(
-                RpcResponse(jsonrpc="2.0", id=rpc_request.id, error=error).model_dump(),
+                RpcResponse(jsonrpc="2.0", id=rpc_request.id).model_dump(),
                 status_code=400,
             )
 
@@ -107,7 +107,7 @@ async def message(request: Request):
                 code=-32602, message="No valid text input found in message."
             )
             return JSONResponse(
-                RpcResponse(jsonrpc="2.0", id=rpc_request.id, error=error).model_dump(),
+                RpcResponse(jsonrpc="2.0", id=rpc_request.id).model_dump(),
                 status_code=400,
             )
 
@@ -182,7 +182,7 @@ async def message(request: Request):
             code=-32000, message="Internal Server Error", data={"detail": str(e)}
         )
         return JSONResponse(
-            RpcResponse(jsonrpc="2.0", id=None, error=error).model_dump(),
+            RpcResponse(jsonrpc="2.0", id=None).model_dump(),
             status_code=500,
         )
 
