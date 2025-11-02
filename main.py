@@ -143,7 +143,7 @@ async def message(request: Request):
             if not history:
                 tip_text = "No fitness history found yet."
             else:
-                tip_text = "📜 Your Fitness Tip History:\n" + "\n".join(
+                tip_text = "\n".join(
                     item.get("tip") if isinstance(item, dict) else str(item)
                     for item in history
                 )
@@ -151,14 +151,14 @@ async def message(request: Request):
         elif "refresh" in user_text.lower() or "new tip" in user_text.lower():
             tip = await generate_tip_from_gemini()
             add_tip_to_history(tip)
-            tip_text = f"🔄 New Fitness Tip:\n{tip}"
+            tip_text = f"{tip}"
 
         else:
             tip = get_cached_tip_for_today()
             if not tip:
                 tip = await generate_tip_from_gemini()
                 add_tip_to_history(tip)
-            tip_text = f"💪 Today's Fitness Tip:\n{tip}"
+            tip_text = f"{tip}"
 
         print(f"💬 Response message: {tip_text}")
 
