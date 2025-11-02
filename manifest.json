@@ -1,0 +1,22 @@
+{
+  "active": true,
+  "category": "health & wellness",
+  "description": "A workflow that provides daily AI-powered health and fitness tips via REST API.",
+  "id": "fitAI_agent_001",
+  "name": "fitness_tip_agent",
+  "short_description": "Provides personalized daily fitness and health tips using AI.",
+  "long_description": "You are an intelligent health and fitness assistant that delivers daily, personalized wellness advice. Your primary function is to help users improve their lifestyle through short, actionable tips on exercise, nutrition, sleep, and mental well-being. When responding:\n- Generate one short, motivational fitness or health tip per request\n- Vary topics daily across fitness, diet, and mindfulness\n- Keep messages friendly, concise, and encouraging\n- Avoid repetitive tips and focus on positive reinforcement.",
+  "nodes": [
+    {
+      "id": "fitness_agent",
+      "name": "Fitness & Health Agent",
+      "type": "a2a/generic-a2a-node",
+      "typeVersion": 1,
+      "position": [800, -100],
+      "url": "https://amazing-dee-wilsonide-93575c7b.koyeb.app/message"
+    }
+  ],
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

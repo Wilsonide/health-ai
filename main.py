@@ -48,7 +48,9 @@ async def message(request: Request):
     """Accepts A2A Telex requests and returns fitness tips."""
     try:
         payload = await request.json()
+        print("my payload: ", payload)
         req = TelexRequest(**payload)
+        print("myrequest : ", req)
 
         message_obj = req.params.message
         parts = message_obj.parts or []
