@@ -1,5 +1,7 @@
 import re
+import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +15,15 @@ from cache import (
 )
 from openai_client import generate_tip_from_openai
 from scheduler import schedule_daily_job, scheduler
-from schemas import RpcError, RpcRequest, RpcResponse
+from schemas import (
+    MessageResponse,
+    MessageResponsePart,
+    ResponseStatus,
+    RpcError,
+    RpcRequest,
+    RpcResponse,
+    RpcResult,
+)
 
 
 @asynccontextmanager
@@ -35,7 +45,7 @@ app = FastAPI(title="Telex AI Fitness Tip Agent", lifespan=lifespan)
 # --- Enable CORS ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # adjust later for production
+    allow_origins=["*"],  # adjust for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -63,28 +73,21 @@ async def message(request: Request):
             response = RpcResponse(jsonrpc="2.0", id=rpc_request.id, error=error)
             return JSONResponse(content=response.model_dump(), status_code=400)
 
-        params = rpc_request.params or {}
-        message_obj = params.message or {}
+        params = rpc_request.params
+        message_obj = params.message
         parts = message_obj.parts or []
 
         current_text = ""
         response_text = ""
 
         # --- Extract user text ---
-        if parts:
-            # 1️⃣ Prefer first text part if non-empty
-            if parts[0].kind == "text" and parts[0].text.strip():
-                current_text = clean_text(parts[0].text)
-            else:
-                # 2️⃣ Otherwise, use the last valid text in any data array
-                for part in reversed(parts):
-                    for data_item in reversed(part.data):
-                        if data_item.kind == "text" and data_item.text.strip():
-                            current_text = clean_text(data_item.text)
-                            break
-                    if current_text:
-                        break
-
+        for part in parts:
+            if part.kind == "text" and part.text.strip():
+                current_text = clean_text(part.text)
+            elif part.kind == "data":
+                for item in part.data:
+                    if item.kind == "text" and item.text.strip():
+                        current_text = clean_text(item.text)
         print(f"🗣️ Extracted user text: {current_text!r}")
 
         if not current_text:
@@ -103,7 +106,7 @@ async def message(request: Request):
                     for item in history
                 ]
                 response_text = "📜 Your Fitness Tip History:\n" + "\n".join(
-                    safe_history,
+                    safe_history
                 )
 
         elif "refresh" in current_text.lower() or "force" in current_text.lower():
@@ -120,17 +123,29 @@ async def message(request: Request):
 
         print(f"💬 Response: {response_text}")
 
-        # ✅ Proper JSON-RPC 2.0 response
+        # ✅ Build Telex-compliant A2A JSON-RPC response
+        msg_part = MessageResponsePart(kind="text", text=response_text)
+        msg_response = MessageResponse(kind="message", role="agent", parts=[msg_part])
+
+        rpc_result = RpcResult(
+            id=str(uuid.uuid4()),
+            contextId=str(rpc_request.id or uuid.uuid4()),
+            kind="message_result",
+            status=ResponseStatus(
+                state="completed",
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                message=msg_response,
+            ),
+            artifacts=[],
+        )
+
         rpc_response = RpcResponse(
             jsonrpc="2.0",
             id=rpc_request.id,
-            result={
-                "message": {
-                    "text": response_text,
-                    "attachments": [],
-                },
-            },
+            result=rpc_result,
         )
+
+        print("✅ Outgoing response:", rpc_response.model_dump())
         return JSONResponse(content=rpc_response.model_dump(), status_code=200)
 
     except Exception as e:
@@ -146,10 +161,10 @@ async def message(request: Request):
 def root():
     return {
         "name": "Telex AI Fitness Tip Agent",
-        "short_description": "Provides daily fitness tips, retrieves full fitness history logs and also allows refreshing tips.",
+        "short_description": "Provides daily fitness tips, retrieves full fitness history logs and allows refreshing tips.",
         "description": (
             "An A2A agent that generates and sends AI-powered daily fitness "
-            "tips, retrieves full fitness history logs and also allows refreshing tips using JSON-RPC 2.0. Designed for use with Telex workflows."
+            "tips, retrieves fitness history logs and allows refreshing tips using JSON-RPC 2.0."
         ),
         "author": "Wilson Icheku",
         "version": "1.0.4",
