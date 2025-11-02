@@ -139,7 +139,7 @@ async def message(request: Request):
             code=-32000, message="Internal Server Error", data={"detail": str(e)}
         )
         rpc_response = RpcResponse(jsonrpc="2.0", id=None, error=error)
-        return JSONResponse(content=rpc_response.dict(), status_code=500)
+        return JSONResponse(content=rpc_response.model_dump(), status_code=500)
 
 
 @app.get("/")
