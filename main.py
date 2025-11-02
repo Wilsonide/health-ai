@@ -162,7 +162,7 @@ async def message(request: Request):
         print(f"💬 Response message: {tip_text}")
 
         # --- ✅ Construct RpcResult ---
-        msg_part = TextPart(kind="text", text=tip_text)
+        msg_part = TextPart(kind="text", text=user_text)
         msg_response = Message(
             kind="message",
             role="agent",

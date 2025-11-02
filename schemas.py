@@ -83,7 +83,6 @@ class RpcResponse(BaseModel):
     jsonrpc: Literal["2.0"]
     id: str | None = None  # ✅ allow None in error cases
     result: Result | None = None  # ✅ optional for error
-    error: RpcError | None = None  # ✅ properly support JSON-RPC error
 
 
 # -------------------------------------------------------------------
