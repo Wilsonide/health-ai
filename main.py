@@ -1,8 +1,8 @@
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import httpx
 
 from cache import (
     add_tip_to_history,
@@ -41,39 +41,34 @@ app.add_middleware(
 )
 
 
-# --- JSON-RPC Endpoint ---
 @app.post("/message")
-async def message(request: Request):  # noqa: C901, PLR0912
-    """Accepts A2A Telex requests and returns fitness tips."""
+async def message(request: Request):
+    """Accepts A2A Telex requests and returns fitness tips to the chatbox."""
     try:
         payload = await request.json()
         print("📩 Incoming payload:", payload)
 
-        # --- Try to extract text from multiple possible Telex structures ---
-        current_text = None
+        params = payload.get("params", {})
+        message_obj = params.get("message", {})
+        parts = message_obj.get("parts", [])
+        config = params.get("configuration", {}).get("pushNotificationConfig", {})
 
-        # Option 1: Direct Telex message part
-        parts = payload.get("params", {}).get("message", {}).get("parts", [])
+        push_url = config.get("url")
+        push_token = config.get("token")
+
+        # --- Extract user text ---
+        current_text = ""
         if parts:
-            # Check for direct text
-            if "text" in parts[0] and parts[0]["text"].strip():
+            # First part should be Telex’s interpretation of user intent
+            if parts[0].get("kind") == "text" and parts[0].get("text"):
                 current_text = parts[0]["text"].strip()
             else:
-                # Try nested data field (parts[1]["data"])
-                for p in parts:
-                    if p.get("kind") == "data" and isinstance(p.get("data"), list):
-                        for d in p["data"]:
-                            if d.get("kind") == "text" and d.get("text"):
-                                current_text = d["text"].strip()
-                                break
-                    if current_text:
-                        break
+                # fallback: maybe from the data array
+                data_parts = parts[0].get("data", []) if len(parts) > 0 else []
+                if data_parts:
+                    current_text = data_parts[-1].get("text", "").strip()
 
-        # Option 2: Fallback for simple {"text": "..."} payload
-        if not current_text:
-            current_text = payload.get("text")
-
-        print("🗣️ Extracted text:", current_text)
+        print(f"🗣️ Extracted text: {current_text}")
 
         if not current_text:
             return JSONResponse(
@@ -81,40 +76,43 @@ async def message(request: Request):  # noqa: C901, PLR0912
                 status_code=400,
             )
 
-        # --- Take only the last 5 words of input ---
-        words = current_text.split()
-        last_five = " ".join(words[-5:])
-        print(f"🧠 Last 5 words: {last_five}")
-
         # --- Command handling ---
         if "history" in current_text.lower():
             history = get_history()
-            print("📜 Returning tip history:", history)
-            return history
-
-        if any(
-            word in current_text.lower() for word in ["refresh", "force", "new tip"]
-        ):
+            response_text = "\n".join(history) if history else "No fitness history found yet."
+        elif "refresh" in current_text.lower() or "force" in current_text.lower():
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
-            print(f"💡 Refreshed Fitness Tip: {tip}")
-            return tip
+            response_text = f"🔄 Refreshed Fitness Tip:\n{tip}"
+        else:
+            tip = get_cached_tip_for_today()
+            if not tip:
+                tip = await generate_tip_from_openai()
+                add_tip_to_history(tip)
+            response_text = f"💪 Today's Fitness Tip:\n{tip}"
 
-        # --- Default: return daily tip ---
-        tip = get_cached_tip_for_today()
-        if not tip:
-            tip = await generate_tip_from_openai()
-            add_tip_to_history(tip)
+        print(f"💬 Response: {response_text}")
 
-            print(f"💪 Fitness Tip: {tip}")
-            return tip
+        # --- Push message back to Telex chat ---
+        if push_url and push_token:
+            async with httpx.AsyncClient() as client:
+                headers = {"Authorization": f"Bearer {push_token}"}
+                data = {
+                    "kind": "message",
+                    "role": "assistant",
+                    "parts": [{"kind": "text", "text": response_text}],
+                }
+                await client.post(push_url, json=data, headers=headers)
+                print("📤 Sent response to Telex chat UI.")
+
+        return {"status": "ok", "message": "Response sent to Telex chat."}
 
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
         return JSONResponse(
             {
                 "status": "error",
-                "message": "Something went wrong while processing your request.",
+                "message": "Something went wrong. Please try again later.",
                 "error": str(e),
             },
             status_code=500,
@@ -131,7 +129,7 @@ def root():
             "tips using JSON-RPC 2.0. Designed for use with Telex workflows."
         ),
         "author": "Wilson Icheku",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "status": "running",
         "message": "Telex Fitness Agent (REST, OpenAI) is active!",
     }
