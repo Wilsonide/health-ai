@@ -16,13 +16,14 @@ from cache import (
 from openai_client import generate_tip_from_gemini
 from scheduler import schedule_daily_job, scheduler
 from schemas import (
-    MessageResponse,
-    MessageResponsePart,
-    ResponseStatus,
+    Artifact,
+    Message,
+    MessagePart,
+    Result,
     RpcError,
     RpcRequest,
     RpcResponse,
-    RpcResult,
+    Status,
 )
 
 
@@ -136,19 +137,34 @@ async def message(request: Request):
         print(f"💬 Response message: {tip_text}")
 
         # --- ✅ Construct RpcResult ---
-        msg_part = MessageResponsePart(kind="text", text=tip_text)
-        msg_response = MessageResponse(kind="message", role="agent", parts=[msg_part])
+        msg_part = MessagePart(kind="text", text=tip_text)
+        msg_response = Message(
+            kind="message",
+            role="agent",
+            parts=[msg_part],
+            taskId=message_obj.taskId,
+            messageId=str(uuid.uuid4()),
+        )
 
-        rpc_result = RpcResult(
+        artifacts = [
+            Artifact(
+                artifactId=str(uuid.uuid4()),
+                name="tip",
+                parts=[MessagePart(kind="text", text=tip_text)],
+            ),
+        ]
+
+        rpc_result = Result(
             id=str(uuid.uuid4()),
             contextId=str(rpc_request.id or uuid.uuid4()),
-            kind="message",
-            status=ResponseStatus(
+            status=Status(
                 state="completed",
                 timestamp=datetime.now(UTC).isoformat(),
                 message=msg_response,
             ),
-            artifacts=[],
+            artifacts=artifacts,
+            history=parts,
+            kind="message",
         )
 
         rpc_response = RpcResponse(

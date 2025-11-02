@@ -17,7 +17,7 @@ class FilePart(BaseModel):
     file_url: str
 
 
-MessagePart = TextPart | FilePart
+MessagePart = TextPart
 
 
 # -------------------------------------------------------------------
@@ -37,7 +37,7 @@ class Message(BaseModel):
 class Artifact(BaseModel):
     artifactId: str
     name: str
-    parts: list[MessagePart]
+    parts: list[FilePart | TextPart]
 
 
 # -------------------------------------------------------------------
@@ -68,3 +68,41 @@ class RpcResponse(BaseModel):
     jsonrpc: Literal["2.0"]
     id: str
     result: Result
+
+
+class AuthenticationConfig(BaseModel):
+    schemes: list[str]
+
+
+class PushNotificationConfig(BaseModel):
+    url: str
+    token: str
+    authentication: AuthenticationConfig
+
+
+class Configuration(BaseModel):
+    acceptedOutputModes: list[str]  # noqa: N815
+    historyLength: int  # noqa: N815
+    pushNotificationConfig: PushNotificationConfig  # noqa: N815
+    blocking: bool
+
+
+class RpcRequestParams(BaseModel):
+    message: Message
+    configuration: Configuration | None = None
+
+
+class RpcRequest(BaseModel):
+    jsonrpc: Literal["2.0"]
+    id: str | int | None = None
+    method: Literal["message/send"]
+    params: RpcRequestParams
+
+
+# -------------------------------------------------------------------
+# ❌ RPC Error Object
+# -------------------------------------------------------------------
+class RpcError(BaseModel):
+    code: int
+    message: str
+    data: Any | None = None
