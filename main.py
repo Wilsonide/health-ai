@@ -65,16 +65,16 @@ async def message(request: Request):
         print(f"🗣️ Last 5 words from user: {last_five}")
 
         # --- Command handling ---
-        if "history" in last_five:
+        if "history" in current_text:
             history = get_history()
             print("📜 Returning tip history:", history)
-            return {"status": "ok", "action": "get_history", "data": history}
+            return history
 
-        if "refresh" in last_five or "force" in last_five:
+        if "refresh" in current_text or "force" in current_text:
             tip = await generate_tip_from_openai()
             add_tip_to_history(tip)
             print(f"💡 Refreshed Fitness Tip: {tip}")
-            return {"status": "ok", "action": "force_refresh", "message": tip}
+            return tip
 
         # --- Default: return daily tip ---
         tip = get_cached_tip_for_today()
@@ -83,7 +83,7 @@ async def message(request: Request):
             add_tip_to_history(tip)
 
             print(f"💡 Fitness Tip: {tip}")
-            return {"status": "ok", "action": "get_daily_tip", "message": tip}
+            return tip
 
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
