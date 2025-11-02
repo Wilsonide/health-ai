@@ -1,3 +1,4 @@
+import re
 from contextlib import asynccontextmanager
 
 import httpx
@@ -29,7 +30,6 @@ async def lifespan(app: FastAPI):
         print("🛑 Scheduler stopped cleanly")
 
 
-# --- FastAPI app instance ---
 app = FastAPI(title="Telex AI Fitness Tip Agent", lifespan=lifespan)
 
 # --- Enable CORS ---
@@ -40,6 +40,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def clean_text(text: str) -> str:
+    """Remove HTML tags and trim whitespace."""
+    return re.sub(r"<.*?>", "", text or "").strip()
 
 
 @app.post("/message")
@@ -57,27 +62,27 @@ async def message(request: Request):
         push_url = config.get("url")
         push_token = config.get("token")
 
-        # --- Extract ONLY the last user text ---
         current_text = ""
 
         if parts:
-            # 1️⃣ Try first part (system interpretation text)
+            # 1️⃣ Prefer the first text part if present and non-empty
             if parts[0].get("kind") == "text" and parts[0].get("text", "").strip():
-                current_text = parts[0]["text"].strip()
+                current_text = clean_text(parts[0]["text"])
             else:
-                # 2️⃣ Otherwise, check for the last text entry in 'data'
+                # 2️⃣ Otherwise, pick the last text entry in any 'data' array
                 for part in reversed(parts):
                     data_array = part.get("data", [])
                     if isinstance(data_array, list) and data_array:
+                        # Get only the last valid text in the data list
                         for data_item in reversed(data_array):
                             if (
                                 data_item.get("kind") == "text"
                                 and data_item.get("text", "").strip()
                             ):
-                                current_text = data_item["text"].strip()
+                                current_text = clean_text(data_item["text"])
                                 break
-                    if current_text:
-                        break
+                        if current_text:
+                            break
 
         print(f"🗣️ Extracted user text: {current_text!r}")
 
@@ -142,7 +147,7 @@ def root():
             "tips using JSON-RPC 2.0. Designed for use with Telex workflows."
         ),
         "author": "Wilson Icheku",
-        "version": "1.0.2",
+        "version": "1.0.3",
         "status": "running",
         "message": "Telex Fitness Agent (REST, OpenAI) is active!",
     }
