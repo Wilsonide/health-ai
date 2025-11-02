@@ -167,7 +167,9 @@ async def message(request: Request):
             kind="message",
             role="agent",
             parts=[msg_part],
-            taskId=message_obj.taskId,
+            taskId=message_obj.taskId
+            if hasattr(message_obj, "taskId")
+            else uuid.uuid4(),
             messageId=str(uuid.uuid4()),
         )
 
