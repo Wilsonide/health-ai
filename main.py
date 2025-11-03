@@ -84,6 +84,8 @@ async def message(request: Request):
         message_obj = params.message
         parts = message_obj.parts or []
 
+        print(f"📝 Messageparams : {message_obj}")
+
         # --- Extract last valid user text ---
         user_text = ""
         tip_text = ""
