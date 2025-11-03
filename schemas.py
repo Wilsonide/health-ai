@@ -99,10 +99,10 @@ class PushNotificationConfig(BaseModel):
 
 
 class Configuration(BaseModel):
-    acceptedOutputModes: list[str]
-    historyLength: int
-    pushNotificationConfig: PushNotificationConfig
-    blocking: bool
+    acceptedOutputModes: list[str] | None = None
+    historyLength: int | None = None
+    pushNotificationConfig: PushNotificationConfig | None = None
+    blocking: bool | None = None
 
 
 class RpcRequestParams(BaseModel):
