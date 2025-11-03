@@ -83,6 +83,7 @@ async def message(request: Request):
         params = rpc_request.params
         message_obj = params.message
         parts = message_obj.parts or []
+        task_id = str(uuid.uuid4())
 
         print(f"📝 Messageparams : {message_obj}")
 
@@ -170,7 +171,7 @@ async def message(request: Request):
             kind="message",
             role="agent",
             parts=[msg_part],
-            taskId=message_obj.taskId if message_obj else uuid.uuid4(),
+            taskId=task_id,
             messageId=str(uuid.uuid4()),
         )
 
@@ -183,7 +184,7 @@ async def message(request: Request):
         ]
 
         rpc_result = Result(
-            id=str(uuid.uuid4()),
+            id=task_id,
             contextId=str(rpc_request.id or uuid.uuid4()),
             status=Status(
                 state="completed",
