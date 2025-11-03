@@ -203,11 +203,10 @@ async def message(request: Request):
         )
 
         print("✅ Sending RPC Response:", rpc_response.model_dump())
-        """ return JSONResponse(
+        return JSONResponse(
             content=rpc_response.model_dump(mode="json"),
             status_code=200,
-        ) """
-        return tip_text
+        )
 
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
