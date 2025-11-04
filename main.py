@@ -7,14 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from cache import (
-    add_tip_to_history,
-    ensure_cache_exists,
-    get_cached_tip_for_today,
-    get_history,
-)
 from openai_client import get_gemini_reply
-from scheduler import schedule_daily_job, scheduler
 from schemas import (
     Artifact,
     Message,
@@ -23,28 +16,11 @@ from schemas import (
     RpcRequest,
     RpcResponse,
     Status,
-    TextPart,
 )
 from utils import build_conversation_history
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Lifecycle: start cache + scheduler."""
-    ensure_cache_exists()
-    schedule_daily_job()
-    print("✅ Scheduler started")
-
-    yield
-
-    if scheduler.running:
-        scheduler.shutdown(wait=False)
-        print("🛑 Scheduler stopped cleanly")
-
-
 app = FastAPI(
     title="Telex AI Fitness Tip Agent",
-    lifespan=lifespan,
     description=(
         "An A2A agent that provides AI-powered daily fitness and wellness tips. "
         "It supports fetching today's cached tip, refreshing for a new one, "
@@ -135,34 +111,8 @@ async def message(request: Request):
 
         print(f"🗣️ User input: {user_text!r}")
 
-        if not user_text:
-            return JSONResponse(
-                RpcResponse(jsonrpc="2.0", id=rpc_request.id).model_dump(mode="json"),
-                status_code=200,
-            )
-
-        # --- Command Logic ---
-        if "history" in user_text.lower() or "log" in user_text.lower():
-            history = get_history()
-            if not history:
-                tip_text = "No fitness history found yet."
-            else:
-                tip_text = "\n".join(
-                    item.get("tip") if isinstance(item, dict) else str(item)
-                    for item in history
-                )
-
-            """ elif "refresh" in user_text.lower() or "new tip" in user_text.lower():
-            tip = await get_gemini_reply(
-                user_id=rpc_request.id,
-                user_message=user_text,
-            )
-            add_tip_to_history(tip)
-            tip_text = f"{tip}" """
-
-        else:
-            tip = await get_gemini_reply(user_id=rpc_request.id, user_message=user_text)
-            tip_text = f"{tip}"
+        tip = await get_gemini_reply(user_id=rpc_request.id, user_message=user_text)
+        tip_text = f"{tip}"
 
         print(f"💬 Response message: {tip_text}")
 
@@ -224,7 +174,9 @@ async def message(request: Request):
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
         return JSONResponse(
-            RpcResponse(jsonrpc="2.0", id=rpc_request.id).model_dump(mode="json"),
+            RpcResponse(id=rpc_request.id | "unknown", result=rpc_result).model_dump(
+                mode="json"
+            ),
             status_code=200,
         )
 
