@@ -13,7 +13,7 @@ from cache import (
     get_cached_tip_for_today,
     get_history,
 )
-from openai_client import generate_tip_from_gemini
+from openai_client import get_gemini_reply
 from scheduler import schedule_daily_job, scheduler
 from schemas import (
     Artifact,
@@ -151,16 +151,16 @@ async def message(request: Request):
                     for item in history
                 )
 
-        elif "refresh" in user_text.lower() or "new tip" in user_text.lower():
-            tip = await generate_tip_from_gemini()
+            """ elif "refresh" in user_text.lower() or "new tip" in user_text.lower():
+            tip = await get_gemini_reply(
+                user_id=rpc_request.id,
+                user_message=user_text,
+            )
             add_tip_to_history(tip)
-            tip_text = f"{tip}"
+            tip_text = f"{tip}" """
 
         else:
-            tip = get_cached_tip_for_today()
-            if not tip:
-                tip = await generate_tip_from_gemini()
-                add_tip_to_history(tip)
+            tip = await get_gemini_reply(user_id=rpc_request.id, user_message=user_text)
             tip_text = f"{tip}"
 
         print(f"💬 Response message: {tip_text}")
