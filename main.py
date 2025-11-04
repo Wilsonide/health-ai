@@ -25,6 +25,7 @@ from schemas import (
     Status,
     TextPart,
 )
+from utils import build_conversation_history
 
 
 @asynccontextmanager
@@ -191,6 +192,11 @@ async def message(request: Request):
             ),
         ]
 
+        history = await build_conversation_history(
+            original_body=data,
+            current_response=tip_text,
+        )
+
         rpc_result = Result(
             id=str(uuid.uuid4()),
             contextId=str(uuid.uuid4()),
@@ -200,7 +206,7 @@ async def message(request: Request):
                 message=msg_response,
             ),
             artifacts=artifacts,
-            history=parts,
+            history=history,
             kind="task",
         )
 
