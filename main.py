@@ -18,6 +18,7 @@ from scheduler import schedule_daily_job, scheduler
 from schemas import (
     Artifact,
     Message,
+    MessagePart,
     Result,
     RpcRequest,
     RpcResponse,
@@ -83,7 +84,6 @@ async def message(request: Request):
         params = rpc_request.params
         message_obj = params.message
         parts = message_obj.parts or []
-        task_id = str(uuid.uuid4())
 
         print(f"📝 Messageparams : {message_obj}")
 
@@ -166,29 +166,37 @@ async def message(request: Request):
         print(f"💬 Response message: {tip_text}")
 
         # --- ✅ Construct RpcResult ---
-        msg_part = TextPart(kind="text", text=tip_text)
+        msg_part = MessagePart(kind="text", text=tip_text, data=None, file_url=None)
         msg_response = Message(
             kind="message",
             role="agent",
             parts=[msg_part],
-            taskId=task_id,
+            taskId=str(uuid.uuid4()),
             messageId=str(uuid.uuid4()),
+            metadata=None,
         )
 
         artifacts = [
             Artifact(
                 artifactId=str(uuid.uuid4()),
-                name="tip",
-                parts=[msg_part],
+                name="health_response",
+                parts=[
+                    MessagePart(
+                        kind="text",
+                        text=tip_text,  # SAME text as in message
+                        data=None,
+                        file_url=None,
+                    ),
+                ],
             ),
         ]
 
         rpc_result = Result(
-            id=task_id,
-            contextId=str(rpc_request.id or uuid.uuid4()),
+            id=str(uuid.uuid4()),
+            contextId=str(uuid.uuid4()),
             status=Status(
                 state="completed",
-                timestamp=datetime.now(UTC).isoformat(),
+                timestamp=datetime.utcnow().isoformat() + "Z",
                 message=msg_response,
             ),
             artifacts=artifacts,
@@ -197,7 +205,6 @@ async def message(request: Request):
         )
 
         rpc_response = RpcResponse(
-            jsonrpc="2.0",
             id=rpc_request.id,
             result=rpc_result,
         )
@@ -211,7 +218,7 @@ async def message(request: Request):
     except Exception as e:
         print(f"⚠️ Error processing message: {e}")
         return JSONResponse(
-            RpcResponse(jsonrpc="2.0", id=None).model_dump(mode="json"),
+            RpcResponse(jsonrpc="2.0", id=rpc_request.id).model_dump(mode="json"),
             status_code=200,
         )
 

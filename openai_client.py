@@ -58,6 +58,7 @@ async def get_gemini_reply(user_id: str, user_message: str) -> str:
     - Responds warmly to greetings.
     - Declines unrelated topics.
     - Maintains per-user chat memory.
+    - Retries on timeout and returns friendly fallback on failure.
     """
     await _rate_guard()
 
@@ -125,15 +126,39 @@ async def get_gemini_reply(user_id: str, user_message: str) -> str:
         "Your response:"
     )
 
-    try:
-        response = await asyncio.wait_for(
-            asyncio.to_thread(chat_session.send_message, prompt),
-            timeout=12.0,
-        )
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="Gemini request timed out")
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Gemini error: {exc}")
+    # --- Retry logic with fallback ---
+    for attempt in range(2):  # one retry allowed
+        try:
+            await _rate_guard()
+            start = time.time()
+            response = await asyncio.wait_for(
+                asyncio.to_thread(chat_session.send_message, prompt),
+                timeout=25.0,  # longer timeout
+            )
+            print(f"✅ Gemini responded in {time.time() - start:.1f}s")
+            break  # success
+        except asyncio.TimeoutError:
+            print(f"⚠️ Gemini timeout on attempt {attempt + 1}")
+            if attempt == 0:
+                # retry with a fresh session
+                _user_sessions.pop(user_id, None)
+                chat_session = get_or_create_session(user_id)
+                continue
+            # fallback after retry
+            fallback = (
+                "Sorry, FitAI’s connection is a bit slow right now. "
+                "Please try again in a few seconds 💪."
+            )
+            add_to_history(user_id, "model", fallback)
+            return fallback
+        except Exception as exc:
+            print(f"❌ Gemini error: {exc}")
+            fallback = (
+                "Oops! Something went wrong while fetching your health tip. "
+                "Please try again shortly 💚."
+            )
+            add_to_history(user_id, "model", fallback)
+            return fallback
 
     # --- Extract Gemini text ---
     raw = getattr(response, "text", "")
@@ -142,7 +167,11 @@ async def get_gemini_reply(user_id: str, user_message: str) -> str:
 
     clean = sanitize_text(raw or "").strip()
     if not clean:
-        raise HTTPException(status_code=502, detail="Empty response from Gemini")
+        fallback = (
+            "Hmm, I couldn’t get a response just now — please try again in a bit 💪."
+        )
+        add_to_history(user_id, "model", fallback)
+        return fallback
 
     # Keep it concise
     if len(clean) > 200:

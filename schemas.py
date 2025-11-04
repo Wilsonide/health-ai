@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Any, Literal
+from uuid import uuid4
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # -------------------------------------------------------------------
@@ -23,18 +24,23 @@ class DataPart(BaseModel):
 
 
 # ✅ Allow text, file, and data kinds
-MessagePart = TextPart | FilePart | DataPart
+class MessagePart(BaseModel):
+    kind: Literal["text", "data", "file"]
+    text: str | None = None
+    data: Any | None = None
+    file_url: str | None = None
 
 
 # -------------------------------------------------------------------
 # 🗣️ Message Object
 # -------------------------------------------------------------------
 class Message(BaseModel):
-    kind: Literal["message"]
-    messageId: str
-    role: str
+    kind: Literal["message"] = "message"
+    role: Literal["user", "agent", "system"]
     parts: list[MessagePart]
-    taskId: str | None = None  # ✅ some messages won't have it
+    messageId: str = Field(default_factory=lambda: str(uuid4()))
+    taskId: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 # -------------------------------------------------------------------
@@ -50,8 +56,8 @@ class Artifact(BaseModel):
 # 🔄 Status Object
 # -------------------------------------------------------------------
 class Status(BaseModel):
-    state: str
-    timestamp: datetime
+    state: Literal["working", "completed", "input-required", "failed"]
+    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
     message: Message
 
 
@@ -59,12 +65,12 @@ class Status(BaseModel):
 # 🧠 Result Object
 # -------------------------------------------------------------------
 class Result(BaseModel):
-    id: str
-    contextId: str
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    contextId: str = Field(default_factory=lambda: str(uuid4()))
     status: Status
-    artifacts: list[Artifact]
-    history: list[Any] = []  # ✅ safe default
-    kind: Literal["task"]
+    artifacts: list[Artifact] = []
+    history: list[Message] | Any = []
+    kind: Literal["task"] = "task"
 
 
 # -------------------------------------------------------------------
@@ -80,9 +86,10 @@ class RpcError(BaseModel):
 # 📤 RPC Response
 # -------------------------------------------------------------------
 class RpcResponse(BaseModel):
-    jsonrpc: Literal["2.0"]
-    id: str | None = None  # ✅ allow None in error cases
-    result: Result | None = None  # ✅ optional for error
+    jsonrpc: Literal["2.0"] = "2.0"
+    id: str
+    result: Result | None = None
+    error: dict[str, Any] | None = None
 
 
 # -------------------------------------------------------------------
@@ -110,8 +117,31 @@ class RpcRequestParams(BaseModel):
     configuration: Configuration | None = None
 
 
+class MessageConfiguration(BaseModel):
+    blocking: bool = True
+    acceptedOutputModes: list[str] = ["text/plain", "image/png"]
+
+
+class MessageParams(BaseModel):
+    message: Message
+    configuration: MessageConfiguration = Field(default_factory=MessageConfiguration)
+
+
+class ExecuteParams(BaseModel):
+    contextId: str | None = None
+    taskId: str | None = None
+    messages: list[Message]
+
+
 class RpcRequest(BaseModel):
     jsonrpc: Literal["2.0"]
-    id: str | int | None = None
-    method: Literal["message/send"]
-    params: RpcRequestParams
+    id: str
+    method: Literal["message/send", "execute"]
+    params: MessageParams | ExecuteParams
+
+
+class JSONRPCRequest(BaseModel):
+    jsonrpc: Literal["2.0"]
+    id: str
+    method: Literal["message/send", "execute"]
+    params: MessageParams | ExecuteParams
