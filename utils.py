@@ -28,7 +28,8 @@ def sanitize_text(raw: str) -> str:
 
 
 async def build_conversation_history(
-    original_body: dict, current_response: Message
+    original_body: dict,
+    current_response: Message,
 ) -> list[Message]:
     """Build conversation history from original request."""
     history = []

@@ -194,7 +194,7 @@ async def message(request: Request):
 
         history = await build_conversation_history(
             original_body=data,
-            current_response=tip_text,
+            current_response=msg_response,
         )
 
         rpc_result = Result(
