@@ -51,12 +51,16 @@ async def message(request: Request):
         print("📩 Incoming payload:", data)
 
         # ✅ Validate JSON-RPC structure
-        rpc_request = RpcRequest(**data)
-        if rpc_request.jsonrpc != "2.0" or rpc_request.method != "message/send":
+
+        if data.get("jsonrpc") != "2.0" or data.get("method") != "message/send":
             return JSONResponse(
-                RpcResponse(jsonrpc="2.0", id=rpc_request.id).model_dump(mode="json"),
+                RpcResponse(
+                    jsonrpc="2.0",
+                    id=data.get("id", "unknown"),
+                ).model_dump(mode="json"),
                 status_code=200,
             )
+        rpc_request = RpcRequest(**data)
 
         params = rpc_request.params
         message_obj = params.message

@@ -62,7 +62,7 @@ async def build_conversation_history(
                                         messageId=str(uuid.uuid4()),
                                         taskId=None,
                                         metadata=None,
-                                    )
+                                    ),
                                 )
                             else:
                                 # Assume agent message for non-HTML text
@@ -73,7 +73,7 @@ async def build_conversation_history(
                                         messageId=str(uuid.uuid4()),
                                         taskId=None,
                                         metadata=None,
-                                    )
+                                    ),
                                 )
         # Add current response to history
         history.append(current_response)
